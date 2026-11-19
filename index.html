@@ -5,13 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Аудиогид 343Э</title>
     
-    <!-- Подключаем ТОЛЬКО Яндекс Карты (без Leaflet) -->
+    <!-- Подключаем ТОЛЬКО Яндекс Карты -->
     <script src="https://api-maps.yandex.ru/2.1/?apikey=ВАШ_API_КЛЮЧ&lang=ru_RU" type="text/javascript"></script>
 
     <style>
         body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; }
         
-        /* Экран приветствия для запроса GPS */
         #start-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #f4f4f4; z-index: 9999;
@@ -27,7 +26,6 @@
         }
         .start-btn:active { background: #218838; transform: scale(0.98); }
 
-        /* Основной интерфейс */
         #app-container { display: none; height: 100vh; display: flex; flex-direction: column; }
         #map { flex: 1; width: 100%; }
         .controls { padding: 10px 15px; background: #fff; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); position: relative; z-index: 1000; }
@@ -47,7 +45,6 @@
 </head>
 <body>
 
-<!-- Экран запроса GPS -->
 <div id="start-screen">
     <h1>Аудиогид 343Э</h1>
     <p>Для работы приложения и определения вашего направления необходим доступ к GPS. Пожалуйста, разрешите доступ во всплывающем окне.</p>
@@ -76,74 +73,77 @@
 </div>
 
 <script>
-    // --- 1. МАССИВЫ ОСТАНОВОК ---
+    // --- 1. ОБНОВЛЕННЫЕ МАССИВЫ ОСТАНОВОК (ПО ДАННЫМ ЯНДЕКС.КАРТ) ---
+    
+    // Направление 1: Ломоносов (Вокзал) → ст. метро «Проспект Ветеранов»
     const ROUTE_TO_PITER = [
-        { name: "г. Ломоносов, вокзал", lat: 59.918079, lng: 29.766315 },
-        { name: "Ломоносовская межрайонная больница", lat: 59.90820, lng: 29.76640 },
-        { name: "Владимирская ул.", lat: 59.90415, lng: 29.76695 },
-        { name: "Александровская ул., угол ул. Победы", lat: 59.90375, lng: 29.77685 },
-        { name: "Красноармейская ул.", lat: 59.90410, lng: 29.78245 },
-        { name: "Швейцарская ул., угол ул. Победы", lat: 59.90435, lng: 29.78915 },
-        { name: "ул. Федюнинского, угол ул. Победы", lat: 59.90460, lng: 29.79630 },
+        { name: "г. Ломоносов, вокзал", lat: 59.91765, lng: 29.77080 },
+        { name: "Ломоносовская межрайонная больница", lat: 59.91386, lng: 29.76722 },
+        { name: "Владимирская ул.", lat: 59.90774, lng: 29.76975 },
+        { name: "Александровская ул., угол ул. Победы", lat: 59.91077, lng: 29.77397 },
+        { name: "Красноармейская ул.", lat: 59.90747, lng: 29.77525 },
+        { name: "Швейцарская ул., угол ул. Победы", lat: 59.90611, lng: 29.77056 },
+        { name: "ул. Федюнинского, угол ул. Победы", lat: 59.90480, lng: 29.79675 },
         { name: "ул. Федюнинского, д. 16", lat: 59.90165, lng: 29.80180 },
         { name: "Ораниенбаумский пр.", lat: 59.89885, lng: 29.80690 },
         { name: "ул. Федюнинского (по требованию)", lat: 59.89810, lng: 29.81840 },
         { name: "ул. Связи", lat: 59.89845, lng: 29.82665 },
         { name: "Новогорская ул.", lat: 59.89985, lng: 29.83590 },
-        { name: "ул. Жоры Антоненко", lat: 59.89860, lng: 29.84475 },
-        { name: "Мордвиновка", lat: 59.89310, lng: 29.86545 },
-        { name: "пос. Просвещения", lat: 59.88795, lng: 29.88240 },
+        { name: "ул. Жоры Антоненко", lat: 59.90169, lng: 29.81689 },
+        { name: "Мордвиновка", lat: 59.89583, lng: 29.82722 },
+        { name: "пос. Просвещения", lat: 59.89758, lng: 29.86054 },
         { name: "Фабричная ул.", lat: 59.88410, lng: 29.89675 },
-        { name: "Разводная ул.", lat: 59.88195, lng: 29.90615 },
+        { name: "Разводная ул.", lat: 59.88068, lng: 29.90392 },
         { name: "Константиновская ул. (Николаевская больница)", lat: 59.87940, lng: 29.91785 },
-        { name: "ул. Аврова", lat: 59.87825, lng: 29.92340 },
-        { name: "ул. Крылова", lat: 59.86695, lng: 29.96980 },
-        { name: "Кропоткинская ул.", lat: 59.86085, lng: 29.99610 },
-        { name: "Фронтовая ул.", lat: 59.85680, lng: 30.01590 },
-        { name: "пр. Будённого", lat: 59.85110, lng: 30.06845 },
-        { name: "Рогачёвский пер.", lat: 59.84540, lng: 30.12355 },
-        { name: "ул. Пионерстроя, угол пр. Ветеранов", lat: 59.83945, lng: 30.12465 },
-        { name: "пр. Ветеранов, угол ул. Пограничника Гарькавого", lat: 59.83960, lng: 30.14585 },
-        { name: "Авангардная ул.", lat: 59.84045, lng: 30.17415 },
-        { name: "пр. Маршала Жукова, угол пр. Ветеранов", lat: 59.84085, lng: 30.19390 },
-        { name: "ул. Солдата Корзуна", lat: 59.84145, lng: 30.22185 },
-        { name: "ст. метро «Проспект Ветеранов»", lat: 59.84215, lng: 30.25195 }
+        { name: "ул. Аврова", lat: 59.87783, lng: 29.92370 },
+        { name: "ул. Крылова", lat: 59.86111, lng: 30.00722 },
+        { name: "Кропоткинская ул.", lat: 59.85276, lng: 30.01969 },
+        { name: "Фронтовая ул.", lat: 59.84740, lng: 30.03471 },
+        { name: "пр. Будённого", lat: 59.85032, lng: 30.09263 },
+        { name: "Рогачёвский пер.", lat: 59.84169, lng: 30.13532 },
+        { name: "ул. Пионерстроя, угол пр. Ветеранов", lat: 59.83975, lng: 30.12510 },
+        { name: "пр. Ветеранов, угол ул. Пограничника Гарькавого", lat: 59.83980, lng: 30.14690 },
+        { name: "Авангардная ул.", lat: 59.84060, lng: 30.17530 },
+        { name: "пр. Маршала Жукова, угол пр. Ветеранов", lat: 59.84105, lng: 30.19510 },
+        { name: "ул. Солдата Корзуна", lat: 59.83494, lng: 30.21713 },
+        { name: "ст. метро «Проспект Ветеранов»", lat: 59.84186, lng: 30.25173 }
     ];
 
+    // Направление 2: ст. метро «Проспект Ветеранов» → г. Ломоносов (Вокзал)
     const ROUTE_TO_LOMONOSOV = [
-        { name: "ст. метро «Проспект Ветеранов»", lat: 59.84245, lng: 30.25120 },
-        { name: "ул. Солдата Корзуна (по требованию)", lat: 59.84165, lng: 30.22290 },
+        { name: "ст. метро «Проспект Ветеранов»", lat: 59.84195, lng: 30.25202 },
+        { name: "ул. Солдата Корзуна (по требованию)", lat: 59.83528, lng: 30.21694 },
         { name: "пр. Маршала Жукова", lat: 59.84105, lng: 30.19510 },
         { name: "Авангардная ул.", lat: 59.84060, lng: 30.17530 },
         { name: "пр. Ветеранов, угол ул. Пограничника Гарькавого", lat: 59.83980, lng: 30.14690 },
         { name: "ул. Пионерстроя, угол пр. Ветеранов", lat: 59.83975, lng: 30.12510 },
-        { name: "Рогачёвский пер.", lat: 59.84555, lng: 30.12385 },
-        { name: "пр. Будённого", lat: 59.85135, lng: 30.06890 },
-        { name: "Фронтовая ул.", lat: 59.85705, lng: 30.01650 },
-        { name: "Кропоткинская ул.", lat: 59.86110, lng: 29.99680 },
-        { name: "ул. Крылова", lat: 59.86720, lng: 29.97040 },
+        { name: "Рогачёвский пер.", lat: 59.84169, lng: 30.13532 },
+        { name: "пр. Будённого", lat: 59.85032, lng: 30.09263 },
+        { name: "Фронтовая ул.", lat: 59.84740, lng: 30.03471 },
+        { name: "Кропоткинская ул.", lat: 59.85276, lng: 30.01969 },
+        { name: "ул. Крылова", lat: 59.86111, lng: 30.00722 },
         { name: "Константиновская ул. (Николаевская больница)", lat: 59.87965, lng: 29.91820 },
-        { name: "Разводная ул.", lat: 59.88215, lng: 29.90665 },
+        { name: "Разводная ул.", lat: 59.88068, lng: 29.90392 },
         { name: "Фабричная ул.", lat: 59.88430, lng: 29.89725 },
-        { name: "пос. Просвещения", lat: 59.88815, lng: 29.88295 },
-        { name: "Мордвиновка", lat: 59.89330, lng: 29.86610 },
-        { name: "Новогорская ул.", lat: 59.90010, lng: 29.83640 },
+        { name: "пос. Просвещения", lat: 59.89758, lng: 29.86054 },
+        { name: "Мордвиновка", lat: 59.89583, lng: 29.82722 },
+        { name: "Новогорская ул.", lat: 59.89985, lng: 29.83590 },
         { name: "ул. Связи", lat: 59.89870, lng: 29.82715 },
         { name: "ул. Федюнинского (по требованию)", lat: 59.89835, lng: 29.81890 },
         { name: "Ораниенбаумский пр.", lat: 59.89910, lng: 29.80740 },
         { name: "ул. Федюнинского, угол ул. Победы", lat: 59.90480, lng: 29.79675 },
-        { name: "Швейцарская ул., угол ул. Победы", lat: 59.90455, lng: 29.78960 },
-        { name: "Красноармейская ул.", lat: 59.90430, lng: 29.78290 },
-        { name: "Александровская ул., угол ул. Победы", lat: 59.90395, lng: 29.77730 },
-        { name: "Владимирская ул.", lat: 59.90435, lng: 29.76950 },
-        { name: "Ломоносовская межрайонная больница", lat: 59.90845, lng: 29.76680 },
+        { name: "Швейцарская ул., угол ул. Победы", lat: 59.90611, lng: 29.77056 },
+        { name: "Красноармейская ул.", lat: 59.90747, lng: 29.77525 },
+        { name: "Александровская ул., угол ул. Победы", lat: 59.91077, lng: 29.77397 },
+        { name: "Владимирская ул.", lat: 59.90774, lng: 29.76975 },
+        { name: "Ломоносовская межрайонная больница", lat: 59.91386, lng: 29.76722 },
         { name: "Рынок (на отдельных схемах)", lat: 59.91140, lng: 29.76920 },
-        { name: "г. Ломоносов, вокзал", lat: 59.918079, lng: 29.766315 }
+        { name: "г. Ломоносов, вокзал", lat: 59.91765, lng: 29.77080 }
     ];
 
     // --- 2. ПЕРЕМЕННЫЕ ---
-    const DEFAULT_LAT = 59.84215; 
-    const DEFAULT_LNG = 30.25195;
+    const DEFAULT_LAT = 59.84195; 
+    const DEFAULT_LNG = 30.25202;
     const CHECK_INTERVAL = 10000; 
     const TRIGGER_RADIUS = 500; 
 
@@ -173,7 +173,6 @@
         document.getElementById('start-screen').style.display = 'none';
         document.getElementById('app-container').style.display = 'flex';
 
-        // Инициализация Яндекс.Карт
         ymaps.ready(() => {
             map = new ymaps.Map("map", {
                 center: [DEFAULT_LAT, DEFAULT_LNG],
@@ -202,8 +201,8 @@
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
-        const distToMetro = getDistance(lat, lng, 59.84245, 30.25120);
-        const distToLomonosov = getDistance(lat, lng, 59.918079, 29.766315);
+        const distToMetro = getDistance(lat, lng, 59.84195, 30.25202);
+        const distToLomonosov = getDistance(lat, lng, 59.91765, 29.77080);
 
         if (distToMetro < distToLomonosov) {
             setRoute('toLomonosov');
@@ -239,13 +238,11 @@
     function drawMapRoute() {
         if (!map) return;
 
-        // Очищаем старые объекты
         map.geoObjects.removeAll();
         routeMarkers = [];
 
         const routeCoords = activePoints.map(p => [p.lat, p.lng]);
         
-        // Рисуем линию
         routePolyline = new ymaps.Polyline(routeCoords, {}, {
             strokeColor: "#007bff",
             strokeWidth: 5,
@@ -253,19 +250,17 @@
         });
         map.geoObjects.add(routePolyline);
 
-        // Рисуем метки
         activePoints.forEach((p, idx) => {
             const placemark = new ymaps.Placemark([p.lat, p.lng], {
                 iconContent: (idx + 1).toString(),
                 hintContent: p.name
             }, {
-                preset: 'islands#blueStretchyIcon' // Синяя иконка с текстом
+                preset: 'islands#blueStretchyIcon'
             });
             map.geoObjects.add(placemark);
             routeMarkers.push(placemark);
         });
         
-        // Автоматически подгоняем карту под весь маршрут
         const bounds = map.geoObjects.getBounds();
         if (bounds) {
             map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 20 });
@@ -279,7 +274,6 @@
         currentGpsLat = position.coords.latitude; 
         currentGpsLng = position.coords.longitude;
 
-        // Обновляем красную точку пользователя
         if (map) {
             if (userPlacemark) {
                 userPlacemark.geometry.setCoordinates([currentGpsLat, currentGpsLng]);
