@@ -5,13 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Аудиогид 343Э</title>
     
-    <!-- Leaflet -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- Яндекс Карты (ВСТАВЬТЕ СВОЙ КЛЮЧ ВМЕСТО ВАШ_API_КЛЮЧ) -->
+    <!-- Подключаем ТОЛЬКО Яндекс Карты (без Leaflet) -->
     <script src="https://api-maps.yandex.ru/2.1/?apikey=ВАШ_API_КЛЮЧ&lang=ru_RU" type="text/javascript"></script>
-    <script src="https://cdn.jsdelivr.net/npm/leaflet-plugins@3.4.0/layer/tile/Yandex.js"></script>
 
     <style>
         body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; }
@@ -48,13 +43,6 @@
 
         .info { text-align: center; font-size: 13px; color: #333; margin-bottom: 5px; }
         .poi-title { font-weight: bold; color: #007bff; font-size: 16px; display: block; margin-top: 5px; }
-        
-        /* Стили для маркеров с цифрами */
-        .number-icon {
-            background-color: #007bff; color: white; border-radius: 50%; border: 2px solid white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.4); text-align: center;
-            font-weight: bold; font-size: 12px; line-height: 20px; width: 20px; height: 20px;
-        }
     </style>
 </head>
 <body>
@@ -89,10 +77,8 @@
 
 <script>
     // --- 1. МАССИВЫ ОСТАНОВОК ---
-    
-    // Направление 1: Ломоносов (Вокзал) → ст. метро «Проспект Ветеранов»
     const ROUTE_TO_PITER = [
-        { name: "г. Ломоносов, вокзал", lat: 59.918079, lng: 29.766315 }, // Обновлено
+        { name: "г. Ломоносов, вокзал", lat: 59.918079, lng: 29.766315 },
         { name: "Ломоносовская межрайонная больница", lat: 59.90820, lng: 29.76640 },
         { name: "Владимирская ул.", lat: 59.90415, lng: 29.76695 },
         { name: "Александровская ул., угол ул. Победы", lat: 59.90375, lng: 29.77685 },
@@ -124,7 +110,6 @@
         { name: "ст. метро «Проспект Ветеранов»", lat: 59.84215, lng: 30.25195 }
     ];
 
-    // Направление 2: ст. метро «Проспект Ветеранов» → г. Ломоносов (Вокзал)
     const ROUTE_TO_LOMONOSOV = [
         { name: "ст. метро «Проспект Ветеранов»", lat: 59.84245, lng: 30.25120 },
         { name: "ул. Солдата Корзуна (по требованию)", lat: 59.84165, lng: 30.22290 },
@@ -153,7 +138,7 @@
         { name: "Владимирская ул.", lat: 59.90435, lng: 29.76950 },
         { name: "Ломоносовская межрайонная больница", lat: 59.90845, lng: 29.76680 },
         { name: "Рынок (на отдельных схемах)", lat: 59.91140, lng: 29.76920 },
-        { name: "г. Ломоносов, вокзал", lat: 59.918079, lng: 29.766315 } // Обновлено
+        { name: "г. Ломоносов, вокзал", lat: 59.918079, lng: 29.766315 }
     ];
 
     // --- 2. ПЕРЕМЕННЫЕ ---
@@ -174,9 +159,8 @@
     let map;
     let routePolyline;
     let routeMarkers = [];
-    let userMarker = null;
-
-    const audioPlayer = new Audio();
+    let userPlacemark = null;
+    let audioPlayer = new Audio();
     
     const statusText = document.getElementById('status-text');
     const currentPoiText = document.getElementById('current-poi');
@@ -189,8 +173,16 @@
         document.getElementById('start-screen').style.display = 'none';
         document.getElementById('app-container').style.display = 'flex';
 
-        initMap();
-        setRoute('toLomonosov');
+        // Инициализация Яндекс.Карт
+        ymaps.ready(() => {
+            map = new ymaps.Map("map", {
+                center: [DEFAULT_LAT, DEFAULT_LNG],
+                zoom: 10,
+                controls: ['zoomControl']
+            });
+
+            setRoute('toLomonosov');
+        });
 
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(onFirstGps, onGpsError, { enableHighAccuracy: true, timeout: 10000 });
@@ -210,7 +202,6 @@
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
-        // Сравниваем расстояние до конечных точек (используем новые координаты вокзала)
         const distToMetro = getDistance(lat, lng, 59.84245, 30.25120);
         const distToLomonosov = getDistance(lat, lng, 59.918079, 29.766315);
 
@@ -244,37 +235,41 @@
             direction === 'toLomonosov' ? '🔄 Направление: В Ломоносов' : '🔄 Направление: В Питер';
     }
 
-    // --- 5. КАРТА ---
-    function initMap() {
-        map = L.map('map', { attributionControl: false }).setView([59.877, 30.0], 10);
-        L.yandex('yandex#map').addTo(map);
-        L.control.attribution({ prefix: '© Яндекс.Карты' }).addTo(map);
-    }
-
+    // --- 5. ОТРИСОВКА ЯНДЕКС.КАРТ ---
     function drawMapRoute() {
-        if (routePolyline) map.removeLayer(routePolyline);
-        routeMarkers.forEach(m => map.removeLayer(m));
+        if (!map) return;
+
+        // Очищаем старые объекты
+        map.geoObjects.removeAll();
         routeMarkers = [];
 
         const routeCoords = activePoints.map(p => [p.lat, p.lng]);
-        routePolyline = L.polyline(routeCoords, { color: '#007bff', weight: 5, opacity: 0.7 }).addTo(map);
+        
+        // Рисуем линию
+        routePolyline = new ymaps.Polyline(routeCoords, {}, {
+            strokeColor: "#007bff",
+            strokeWidth: 5,
+            strokeOpacity: 0.7
+        });
+        map.geoObjects.add(routePolyline);
 
+        // Рисуем метки
         activePoints.forEach((p, idx) => {
-            const numberIcon = L.divIcon({
-                className: 'number-icon',
-                html: (idx + 1).toString(),
-                iconSize: [24, 24],
-                iconAnchor: [12, 12],
-                popupAnchor: [0, -12]
+            const placemark = new ymaps.Placemark([p.lat, p.lng], {
+                iconContent: (idx + 1).toString(),
+                hintContent: p.name
+            }, {
+                preset: 'islands#blueStretchyIcon' // Синяя иконка с текстом
             });
-            const marker = L.marker([p.lat, p.lng], { icon: numberIcon })
-                .addTo(map)
-                .bindPopup(`<b>${idx + 1}. ${p.name}</b>`);
-            routeMarkers.push(marker);
+            map.geoObjects.add(placemark);
+            routeMarkers.push(placemark);
         });
         
-        const bounds = L.latLngBounds(routeCoords);
-        map.fitBounds(bounds, { padding: [20, 20] });
+        // Автоматически подгоняем карту под весь маршрут
+        const bounds = map.geoObjects.getBounds();
+        if (bounds) {
+            map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 20 });
+        }
     }
 
     // --- 6. ЛОГИКА GPS ---
@@ -284,12 +279,18 @@
         currentGpsLat = position.coords.latitude; 
         currentGpsLng = position.coords.longitude;
 
-        if (userMarker) {
-            userMarker.setLatLng([currentGpsLat, currentGpsLng]);
-        } else {
-            userMarker = L.circleMarker([currentGpsLat, currentGpsLng], { 
-                radius: 8, fillColor: '#ff0000', color: '#fff', weight: 2, fillOpacity: 1 
-            }).addTo(map).bindPopup('Вы здесь');
+        // Обновляем красную точку пользователя
+        if (map) {
+            if (userPlacemark) {
+                userPlacemark.geometry.setCoordinates([currentGpsLat, currentGpsLng]);
+            } else {
+                userPlacemark = new ymaps.Placemark([currentGpsLat, currentGpsLng], {
+                    hintContent: 'Вы здесь'
+                }, {
+                    preset: 'islands#redDotIcon'
+                });
+                map.geoObjects.add(userPlacemark);
+            }
         }
     }
 
@@ -347,8 +348,8 @@
         btnPrev.disabled = (currentIndex === 0);
         btnNext.disabled = (currentIndex === activePoints.length - 1);
         
-        if (centerMap) {
-            map.setView([point.lat, point.lng], 15);
+        if (centerMap && map) {
+            map.setCenter([point.lat, point.lng], 15);
         }
     }
 
