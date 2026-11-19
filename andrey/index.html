@@ -58,7 +58,7 @@
 </head>
 <body>
 
-<!-- Экран запроса GPS (решает проблему с iOS и др.) -->
+<!-- Экран запроса GPS -->
 <div id="start-screen">
     <h1>Аудиогид 343Э</h1>
     <p>Для работы приложения и определения вашего направления необходим доступ к GPS. Пожалуйста, разрешите доступ во всплывающем окне.</p>
@@ -87,14 +87,14 @@
 </div>
 
 <script>
-    // --- 1. МАССИВЫ ОСТАНОВОК (ИЗ ВАШИХ СКРИНШОТОВ) ---
+    // --- 1. МАССИВЫ ОСТАНОВОК (ВЫРОВНЕНЫ ПО ДОРОГАМ) ---
     
-    // Направление 1: Из Питера в Ломоносов (27 остановок)
+    // Направление 1: Из Питера в Ломоносов
     const ROUTE_TO_LOMONOSOV = [
         { name: "Метро «Проспект Ветеранов»", lat: 59.8427, lng: 30.2455 },
-        { name: "Ул. Солдата Корзуна", lat: 59.8336, lng: 30.2186 },
-        { name: "Пр. Маршала Жукова", lat: 59.8330, lng: 30.1959 },
-        { name: "Авангардная ул.", lat: 59.8330, lng: 30.1832 },
+        { name: "Ул. Солдата Корзуна", lat: 59.8341, lng: 30.2183 },
+        { name: "Пр. Маршала Жукова", lat: 59.8335, lng: 30.1955 },
+        { name: "Авангардная ул.", lat: 59.8331, lng: 30.1830 },
         { name: "Пр. Ветеранов, уг. ул. Пограничника Гарькавого", lat: 59.8353, lng: 30.1478 },
         { name: "Ул. Пионерстроя", lat: 59.8353, lng: 30.1278 },
         { name: "Рогачёвский пер.", lat: 59.8360, lng: 30.1070 },
@@ -121,7 +121,7 @@
         { name: "Ломоносов, вокзал (Привокзальная пл.)", lat: 59.9060, lng: 29.8400 }
     ];
 
-    // Направление 2: Из Ломоносова в Питер (Обратный порядок + Улица Аврова)
+    // Направление 2: Из Ломоносова в Питер (с добавленной ул. Аврова)
     const ROUTE_TO_PITER = [
         { name: "Ломоносов, вокзал (Привокзальная пл.)", lat: 59.9060, lng: 29.8400 },
         { name: "Рынок", lat: 59.9070, lng: 29.7900 },
@@ -139,7 +139,7 @@
         { name: "Фабричная ул.", lat: 59.8827, lng: 29.8901 },
         { name: "Разводная ул.", lat: 59.8850, lng: 29.9110 },
         { name: "Константиновская ул. (Николаевская больница)", lat: 59.8880, lng: 29.9030 },
-        { name: "Улица Аврова", lat: 59.8860, lng: 29.9070 }, // Добавлена для обратного направления
+        { name: "Улица Аврова", lat: 59.8860, lng: 29.9070 }, 
         { name: "Ул. Крылова (Петергоф)", lat: 59.8760, lng: 29.9300 },
         { name: "Кропоткинская ул. (Стрельна)", lat: 59.8660, lng: 29.9540 },
         { name: "Фронтовая ул. (Стрельна)", lat: 59.8590, lng: 29.9770 },
@@ -147,9 +147,9 @@
         { name: "Рогачёвский пер.", lat: 59.8360, lng: 30.1070 },
         { name: "Ул. Пионерстроя", lat: 59.8353, lng: 30.1278 },
         { name: "Пр. Ветеранов, уг. ул. Пограничника Гарькавого", lat: 59.8353, lng: 30.1478 },
-        { name: "Авангардная ул.", lat: 59.8330, lng: 30.1832 },
-        { name: "Пр. Маршала Жукова", lat: 59.8330, lng: 30.1959 },
-        { name: "Ул. Солдата Корзуна", lat: 59.8336, lng: 30.2186 },
+        { name: "Авангардная ул.", lat: 59.8331, lng: 30.1830 },
+        { name: "Пр. Маршала Жукова", lat: 59.8335, lng: 30.1955 },
+        { name: "Ул. Солдата Корзуна", lat: 59.8341, lng: 30.2183 },
         { name: "Метро «Проспект Ветеранов»", lat: 59.8427, lng: 30.2455 }
     ];
 
@@ -157,10 +157,10 @@
     const DEFAULT_LAT = 59.8427; 
     const DEFAULT_LNG = 30.2455;
     const CHECK_INTERVAL = 10000; 
-    const TRIGGER_RADIUS = 500; // Срабатывание за 500 метров
+    const TRIGGER_RADIUS = 300; // Радиус срабатывания 300 метров
 
-    let activePoints = []; // Текущий активный маршрут
-    let currentDirection = 'toLomonosov'; // 'toLomonosov' или 'toPiter'
+    let activePoints = []; 
+    let currentDirection = 'toLomonosov'; 
     let currentIndex = 0;
     let currentGpsLat = DEFAULT_LAT;
     let currentGpsLng = DEFAULT_LNG;
@@ -168,17 +168,14 @@
     let isAutoMode = true;
     let directionDetected = false;
 
-    // Карта и маркеры
     let map;
     let routePolyline;
     let routeMarkers = [];
     let userMarker = null;
     let isMapCenteredOnUser = false;
 
-    // Аудио
     const audioPlayer = new Audio();
     
-    // DOM элементы
     const statusText = document.getElementById('status-text');
     const currentPoiText = document.getElementById('current-poi');
     const btnPrev = document.getElementById('btn-prev');
@@ -191,11 +188,8 @@
         document.getElementById('app-container').style.display = 'flex';
 
         initMap();
-        
-        // Инициализируем дефолтный маршрут, чтобы карта не была пустой
         setRoute('toLomonosov');
 
-        // Запуск GPS (вызывается по клику, поэтому iOS разрешит)
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(onFirstGps, onGpsError, { enableHighAccuracy: true, timeout: 10000 });
             navigator.geolocation.watchPosition(onGpsUpdate, onGpsError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
@@ -207,14 +201,13 @@
         setInterval(checkLocationAndPlay, CHECK_INTERVAL);
     }
 
-    // --- 4. ЛОГИКА ОПРЕДЕЛЕНИЯ НАПРАВЛЕНИЯ ---
+    // --- 4. ОПРЕДЕЛЕНИЕ НАПРАВЛЕНИЯ ---
     function onFirstGps(position) {
         if (directionDetected) return;
 
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
-        // Считаем расстояние до первых остановок обоих маршрутов
         const distToMetro = getDistance(lat, lng, 59.8427, 30.2455);
         const distToLomonosov = getDistance(lat, lng, 59.9060, 29.8400);
 
@@ -228,7 +221,6 @@
         directionDetected = true;
     }
 
-    // Ручное переключение направления
     document.getElementById('btn-toggle-direction').addEventListener('click', () => {
         if (currentDirection === 'toLomonosov') {
             setRoute('toPiter');
@@ -241,9 +233,7 @@
         currentDirection = direction;
         activePoints = (direction === 'toLomonosov') ? ROUTE_TO_LOMONOSOV : ROUTE_TO_PITER;
         
-        // Сбрасываем индекс на ближайшую остановку
         findNearestPoint(); 
-        
         drawMapRoute();
         updateUI(true);
         
@@ -251,7 +241,7 @@
             direction === 'toLomonosov' ? '🔄 Направление: В Ломоносов (нажмите чтобы сменить)' : '🔄 Направление: В Питер (нажмите чтобы сменить)';
     }
 
-    // --- 5. ЛОГИКА КАРТЫ ---
+    // --- 5. КАРТА ---
     function initMap() {
         map = L.map('map', { attributionControl: false }).setView([DEFAULT_LAT, DEFAULT_LNG], 12);
         L.yandex('yandex#map').addTo(map);
@@ -259,16 +249,13 @@
     }
 
     function drawMapRoute() {
-        // Удаляем старую линию и маркеры
         if (routePolyline) map.removeLayer(routePolyline);
         routeMarkers.forEach(m => map.removeLayer(m));
         routeMarkers = [];
 
-        // Рисуем линию
         const routeCoords = activePoints.map(p => [p.lat, p.lng]);
         routePolyline = L.polyline(routeCoords, { color: '#007bff', weight: 5, opacity: 0.7 }).addTo(map);
 
-        // Рисуем маркеры
         activePoints.forEach((p, idx) => {
             const numberIcon = L.divIcon({
                 className: 'number-icon',
@@ -324,7 +311,6 @@
             if (d < minDist) { minDist = d; nearestIdx = idx; }
         });
         
-        // Если ближайшая точка изменилась и мы в радиусе 500м, переключаем
         if (nearestIdx !== currentIndex && minDist <= TRIGGER_RADIUS) {
             currentIndex = nearestIdx; 
             updateUI(false); 
@@ -343,14 +329,10 @@
     function playAudio(index) {
         audioPlayer.pause();
         audioPlayer.currentTime = 0;
-        
-        // Для обратного маршрута мы используем ту же нумерацию файлов (1.mp3, 2.mp3...)
-        // Если вы захотите отдельные файлы для обратного маршрута, измените путь здесь.
         const trackNumber = index + 1;
         audioPlayer.src = `audio/${trackNumber}.mp3`;
-        
         audioPlayer.play().catch(e => {
-            console.warn(`Аудиофайл audio/${trackNumber}.mp3 не найден или заблокирован.`, e);
+            console.warn(`Аудиофайл audio/${trackNumber}.mp3 не найден.`, e);
             statusText.textContent = `Файл audio/${trackNumber}.mp3 не найден.`;
         });
     }
@@ -369,26 +351,18 @@
         }
     }
 
-    // Кнопки ручного переключения
     btnNext.addEventListener('click', () => {
         if (currentIndex < activePoints.length - 1) { 
-            isAutoMode = false; 
-            currentIndex++; 
-            updateUI(true); 
-            playAudio(currentIndex);
+            isAutoMode = false; currentIndex++; updateUI(true); playAudio(currentIndex);
         }
     });
 
     btnPrev.addEventListener('click', () => {
         if (currentIndex > 0) { 
-            isAutoMode = false; 
-            currentIndex--; 
-            updateUI(true); 
-            playAudio(currentIndex);
+            isAutoMode = false; currentIndex--; updateUI(true); playAudio(currentIndex);
         }
     });
 
-    // Вспомогательная функция расчета расстояния
     function getDistance(lat1, lon1, lat2, lon2) {
         const R = 6371000; const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180;
         const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
