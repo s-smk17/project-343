@@ -88,9 +88,8 @@
 </div>
 
 <script>
-    // --- 1. ПРОВЕРЕННЫЕ МАССИВЫ ОСТАНОВОК ---
+    // --- 1. МАССИВЫ ОСТАНОВОК ---
     
-    // Направление 1: Из Питера в Ломоносов
     const ROUTE_TO_LOMONOSOV = [
         { name: "Метро «Проспект Ветеранов»", lat: 59.84272, lng: 30.24544 },
         { name: "Ул. Солдата Корзуна", lat: 59.83492, lng: 30.22037 },
@@ -122,7 +121,6 @@
         { name: "Ломоносов, вокзал (Привокзальная пл.)", lat: 59.90905, lng: 29.77208 }
     ];
 
-    // Направление 2: Из Ломоносова в Питер (с добавленной ул. Аврова)
     const ROUTE_TO_PITER = [
         { name: "Ломоносов, вокзал (Привокзальная пл.)", lat: 59.90905, lng: 29.77208 },
         { name: "Рынок", lat: 59.90812, lng: 29.77782 },
@@ -158,7 +156,7 @@
     const DEFAULT_LAT = 59.84272; 
     const DEFAULT_LNG = 30.24544;
     const CHECK_INTERVAL = 10000; 
-    const TRIGGER_RADIUS = 500; // Радиус срабатывания аудио (500 метров)
+    const TRIGGER_RADIUS = 500; 
 
     let activePoints = []; 
     let currentDirection = 'toLomonosov'; 
@@ -173,9 +171,7 @@
     let routePolyline;
     let routeMarkers = [];
     let userMarker = null;
-    let isMapCenteredOnUser = false;
 
-    // Аудиоплеер
     const audioPlayer = new Audio();
     
     const statusText = document.getElementById('status-text');
@@ -184,7 +180,7 @@
     const btnNext = document.getElementById('btn-next');
     const gpsWarning = document.getElementById('gps-warning');
 
-    // --- 3. ЗАПУСК ПРИЛОЖЕНИЯ ---
+    // --- 3. ЗАПУСК ---
     function startApp() {
         document.getElementById('start-screen').style.display = 'none';
         document.getElementById('app-container').style.display = 'flex';
@@ -212,6 +208,19 @@
 
         const distToMetro = getDistance(lat, lng, 59.84272, 30.24544);
         const distToLomonosov = getDistance(lat, lng, 59.90905, 29.77208);
+        
+        // Проверяем, находимся ли мы вообще рядом с маршрутом (в пределах 10 км от любой точки)
+        let minRouteDist = Infinity;
+        ROUTE_TO_LOMONOSOV.forEach(p => {
+            const d = getDistance(lat, lng, p.lat, p.lng);
+            if (d < minRouteDist) minRouteDist = d;
+        });
+
+        if (minRouteDist > 10000) {
+            statusText.textContent = "Вы далеко от маршрута. Используется направление по умолчанию.";
+            directionDetected = true; 
+            return;
+        }
 
         if (distToMetro < distToLomonosov) {
             setRoute('toLomonosov');
@@ -237,15 +246,16 @@
         
         findNearestPoint(); 
         drawMapRoute();
-        updateUI(true);
+        updateUI(false); // false = не центрировать карту на текущей точке, чтобы не сбивать масштаб
         
         document.getElementById('btn-toggle-direction').textContent = 
-            direction === 'toLomonosov' ? '🔄 Направление: В Ломоносов (нажмите чтобы сменить)' : '🔄 Направление: В Питер (нажмите чтобы сменить)';
+            direction === 'toLomonosov' ? '🔄 Направление: В Ломоносов' : '🔄 Направление: В Питер';
     }
 
     // --- 5. КАРТА ---
     function initMap() {
-        map = L.map('map', { attributionControl: false }).setView([DEFAULT_LAT, DEFAULT_LNG], 12);
+        // Инициализация с обзорным видом
+        map = L.map('map', { attributionControl: false }).setView([59.877, 30.0], 10);
         L.yandex('yandex#map').addTo(map);
         L.control.attribution({ prefix: '© Яндекс.Карты' }).addTo(map);
     }
@@ -271,26 +281,26 @@
                 .bindPopup(`<b>${idx + 1}. ${p.name}</b>`);
             routeMarkers.push(marker);
         });
+        
+        // Автоматически подгоняем карту так, чтобы был виден ВЕСЬ маршрут
+        const bounds = L.latLngBounds(routeCoords);
+        map.fitBounds(bounds, { padding: [20, 20] });
     }
 
-    // --- 6. ЛОГИКА GPS И АУДИО ---
+    // --- 6. ЛОГИКА GPS ---
     function onGpsUpdate(position) {
         gpsAvailable = true;
         gpsWarning.style.display = 'none';
         currentGpsLat = position.coords.latitude; 
         currentGpsLng = position.coords.longitude;
 
+        // Просто обновляем/создаем красную точку, НЕ ДВИГАЯ КАРТУ
         if (userMarker) {
             userMarker.setLatLng([currentGpsLat, currentGpsLng]);
         } else {
             userMarker = L.circleMarker([currentGpsLat, currentGpsLng], { 
                 radius: 8, fillColor: '#ff0000', color: '#fff', weight: 2, fillOpacity: 1 
             }).addTo(map).bindPopup('Вы здесь');
-        }
-
-        if (!isMapCenteredOnUser) {
-            map.setView([currentGpsLat, currentGpsLng], 15);
-            isMapCenteredOnUser = true;
         }
     }
 
@@ -348,6 +358,7 @@
         btnPrev.disabled = (currentIndex === 0);
         btnNext.disabled = (currentIndex === activePoints.length - 1);
         
+        // Центрируем карту только если пользователь САМ нажал "Вперед/Назад"
         if (centerMap) {
             map.setView([point.lat, point.lng], 15);
         }
