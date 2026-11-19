@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Аудиогид 343Э</title>
+    
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Яндекс Карты (ВСТАВЬТЕ СВОЙ КЛЮЧ) -->
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=ВАШ_API_КЛЮЧ&lang=ru_RU" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-plugins@3.4.0/layer/tile/Yandex.js"></script>
+
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; }
+        
+        /* Экран приветствия для запроса GPS */
+        #start-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #f4f4f4; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 20px; box-sizing: border-box; text-align: center;
+        }
+        #start-screen h1 { color: #007bff; margin-bottom: 10px; }
+        #start-screen p { color: #555; margin-bottom: 30px; max-width: 300px; }
+        .start-btn {
+            padding: 15px 30px; font-size: 18px; border: none; border-radius: 50px;
+            background: #28a745; color: white; font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2); cursor: pointer;
+        }
+        .start-btn:active { background: #218838; transform: scale(0.98); }
+
+        /* Основной интерфейс */
+        #app-container { display: none; height: 100vh; display: flex; flex-direction: column; }
+        #map { flex: 1; width: 100%; }
+        .controls { padding: 10px 15px; background: #fff; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); position: relative; z-index: 1000; }
+        .gps-warning { background: #ffcccc; color: #900; padding: 5px; font-size: 12px; text-align: center; display: none; }
+        
+        .btn-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        button.action-btn { flex: 1; padding: 12px; font-size: 15px; border: none; border-radius: 8px; background: #007bff; color: white; font-weight: bold; }
+        button.action-btn:active { background: #0056b3; }
+        button.action-btn:disabled { background: #ccc; }
+        
+        .direction-btn { background: #ff9800; margin-bottom: 10px; width: 100%; padding: 10px; border: none; border-radius: 8px; color: white; font-weight: bold; font-size: 14px; }
+        .direction-btn:active { background: #e68a00; }
+
+        .info { text-align: center; font-size: 13px; color: #333; margin-bottom: 5px; }
+        .poi-title { font-weight: bold; color: #007bff; font-size: 16px; display: block; margin-top: 5px; }
+        
+        .number-icon {
+            background-color: #007bff; color: white; border-radius: 50%; border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4); text-align: center;
+            font-weight: bold; font-size: 12px; line-height: 20px; width: 20px; height: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Экран запроса GPS (решает проблему с iOS и др.) -->
+<div id="start-screen">
+    <h1>Аудиогид 343Э</h1>
+    <p>Для работы приложения и определения вашего направления необходим доступ к GPS. Пожалуйста, разрешите доступ во всплывающем окне.</p>
+    <button class="start-btn" onclick="startApp()">▶ Разрешить GPS и начать</button>
+</div>
+
+<div id="app-container">
+    <div id="gps-warning" class="gps-warning">
+        Включите пожалуйста gps в настройках для корректной работы.
+    </div>
+    <div id="map"></div>
+
+    <div class="controls">
+        <button id="btn-toggle-direction" class="direction-btn">🔄 Сменить направление</button>
+        
+        <div class="btn-group">
+            <button id="btn-prev" class="action-btn" disabled>◀ Назад</button>
+            <button id="btn-next" class="action-btn" disabled>Вперед ▶</button>
+        </div>
+        
+        <div class="info" id="status-text">Ожидание GPS...</div>
+        <div class="info">
+            <span id="current-poi">Текущая: —</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 1. МАССИВЫ ОСТАНОВОК (ИЗ ВАШИХ СКРИНШОТОВ) ---
+    
+    // Направление 1: Из Питера в Ломоносов (27 остановок)
+    const ROUTE_TO_LOMONOSOV = [
+        { name: "Метро «Проспект Ветеранов»", lat: 59.8427, lng: 30.2455 },
+        { name: "Ул. Солдата Корзуна", lat: 59.8336, lng: 30.2186 },
+        { name: "Пр. Маршала Жукова", lat: 59.8330, lng: 30.1959 },
+        { name: "Авангардная ул.", lat: 59.8330, lng: 30.1832 },
+        { name: "Пр. Ветеранов, уг. ул. Пограничника Гарькавого", lat: 59.8353, lng: 30.1478 },
+        { name: "Ул. Пионерстроя", lat: 59.8353, lng: 30.1278 },
+        { name: "Рогачёвский пер.", lat: 59.8360, lng: 30.1070 },
+        { name: "Проспект Будённого", lat: 59.8514, lng: 30.0909 },
+        { name: "Фронтовая ул. (Стрельна)", lat: 59.8590, lng: 29.9770 },
+        { name: "Кропоткинская ул. (Стрельна)", lat: 59.8660, lng: 29.9540 },
+        { name: "Ул. Крылова (Петергоф)", lat: 59.8760, lng: 29.9300 },
+        { name: "Константиновская ул. (Николаевская больница)", lat: 59.8880, lng: 29.9030 },
+        { name: "Разводная ул.", lat: 59.8850, lng: 29.9110 },
+        { name: "Фабричная ул.", lat: 59.8827, lng: 29.8901 },
+        { name: "Пос. Просвещения", lat: 59.8962, lng: 29.8632 },
+        { name: "Мордвиновка (Морская ул.)", lat: 59.8994, lng: 29.8277 },
+        { name: "Новогорская ул.", lat: 59.9020, lng: 29.8240 },
+        { name: "Ул. Жоры Антоненко", lat: 59.9010, lng: 29.8260 },
+        { name: "Ул. Связи", lat: 59.9080, lng: 29.8090 },
+        { name: "Ул. Федюнинского / Ораниенбаумский пр.", lat: 59.9090, lng: 29.7960 },
+        { name: "Ул. Федюнинского, угол ул. Победы", lat: 59.9100, lng: 29.7810 },
+        { name: "Швейцарская ул., угол ул. Победы", lat: 59.9090, lng: 29.7770 },
+        { name: "Красноармейская ул.", lat: 59.9090, lng: 29.7790 },
+        { name: "Александровская ул., угол ул. Победы", lat: 59.9087, lng: 29.7810 },
+        { name: "Владимирская ул.", lat: 59.9103, lng: 29.7702 },
+        { name: "Ломоносовская межрайонная больница", lat: 59.9050, lng: 29.8350 },
+        { name: "Рынок", lat: 59.9070, lng: 29.7900 },
+        { name: "Ломоносов, вокзал (Привокзальная пл.)", lat: 59.9060, lng: 29.8400 }
+    ];
+
+    // Направление 2: Из Ломоносова в Питер (Обратный порядок + Улица Аврова)
+    const ROUTE_TO_PITER = [
+        { name: "Ломоносов, вокзал (Привокзальная пл.)", lat: 59.9060, lng: 29.8400 },
+        { name: "Рынок", lat: 59.9070, lng: 29.7900 },
+        { name: "Владимирская ул.", lat: 59.9103, lng: 29.7702 },
+        { name: "Александровская ул., угол ул. Победы", lat: 59.9087, lng: 29.7810 },
+        { name: "Красноармейская ул.", lat: 59.9090, lng: 29.7790 },
+        { name: "Швейцарская ул., угол ул. Победы", lat: 59.9090, lng: 29.7770 },
+        { name: "Ул. Федюнинского, угол ул. Победы", lat: 59.9100, lng: 29.7810 },
+        { name: "Ул. Федюнинского / Ораниенбаумский пр.", lat: 59.9090, lng: 29.7960 },
+        { name: "Ул. Связи", lat: 59.9080, lng: 29.8090 },
+        { name: "Ул. Жоры Антоненко", lat: 59.9010, lng: 29.8260 },
+        { name: "Новогорская ул.", lat: 59.9020, lng: 29.8240 },
+        { name: "Мордвиновка (Морская ул.)", lat: 59.8994, lng: 29.8277 },
+        { name: "Пос. Просвещения", lat: 59.8962, lng: 29.8632 },
+        { name: "Фабричная ул.", lat: 59.8827, lng: 29.8901 },
+        { name: "Разводная ул.", lat: 59.8850, lng: 29.9110 },
+        { name: "Константиновская ул. (Николаевская больница)", lat: 59.8880, lng: 29.9030 },
+        { name: "Улица Аврова", lat: 59.8860, lng: 29.9070 }, // Добавлена для обратного направления
+        { name: "Ул. Крылова (Петергоф)", lat: 59.8760, lng: 29.9300 },
+        { name: "Кропоткинская ул. (Стрельна)", lat: 59.8660, lng: 29.9540 },
+        { name: "Фронтовая ул. (Стрельна)", lat: 59.8590, lng: 29.9770 },
+        { name: "Проспект Будённого", lat: 59.8514, lng: 30.0909 },
+        { name: "Рогачёвский пер.", lat: 59.8360, lng: 30.1070 },
+        { name: "Ул. Пионерстроя", lat: 59.8353, lng: 30.1278 },
+        { name: "Пр. Ветеранов, уг. ул. Пограничника Гарькавого", lat: 59.8353, lng: 30.1478 },
+        { name: "Авангардная ул.", lat: 59.8330, lng: 30.1832 },
+        { name: "Пр. Маршала Жукова", lat: 59.8330, lng: 30.1959 },
+        { name: "Ул. Солдата Корзуна", lat: 59.8336, lng: 30.2186 },
+        { name: "Метро «Проспект Ветеранов»", lat: 59.8427, lng: 30.2455 }
+    ];
+
+    // --- 2. ПЕРЕМЕННЫЕ ---
+    const DEFAULT_LAT = 59.8427; 
+    const DEFAULT_LNG = 30.2455;
+    const CHECK_INTERVAL = 10000; 
+    const TRIGGER_RADIUS = 500; // Срабатывание за 500 метров
+
+    let activePoints = []; // Текущий активный маршрут
+    let currentDirection = 'toLomonosov'; // 'toLomonosov' или 'toPiter'
+    let currentIndex = 0;
+    let currentGpsLat = DEFAULT_LAT;
+    let currentGpsLng = DEFAULT_LNG;
+    let gpsAvailable = false;
+    let isAutoMode = true;
+    let directionDetected = false;
+
+    // Карта и маркеры
+    let map;
+    let routePolyline;
+    let routeMarkers = [];
+    let userMarker = null;
+    let isMapCenteredOnUser = false;
+
+    // Аудио
+    const audioPlayer = new Audio();
+    
+    // DOM элементы
+    const statusText = document.getElementById('status-text');
+    const currentPoiText = document.getElementById('current-poi');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNext = document.getElementById('btn-next');
+    const gpsWarning = document.getElementById('gps-warning');
+
+    // --- 3. ЗАПУСК ПРИЛОЖЕНИЯ ---
+    function startApp() {
+        document.getElementById('start-screen').style.display = 'none';
+        document.getElementById('app-container').style.display = 'flex';
+
+        initMap();
+        
+        // Инициализируем дефолтный маршрут, чтобы карта не была пустой
+        setRoute('toLomonosov');
+
+        // Запуск GPS (вызывается по клику, поэтому iOS разрешит)
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(onFirstGps, onGpsError, { enableHighAccuracy: true, timeout: 10000 });
+            navigator.geolocation.watchPosition(onGpsUpdate, onGpsError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+        } else { 
+            gpsWarning.style.display = 'block'; 
+            statusText.textContent = 'Браузер не поддерживает GPS.'; 
+        }
+
+        setInterval(checkLocationAndPlay, CHECK_INTERVAL);
+    }
+
+    // --- 4. ЛОГИКА ОПРЕДЕЛЕНИЯ НАПРАВЛЕНИЯ ---
+    function onFirstGps(position) {
+        if (directionDetected) return;
+
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        // Считаем расстояние до первых остановок обоих маршрутов
+        const distToMetro = getDistance(lat, lng, 59.8427, 30.2455);
+        const distToLomonosov = getDistance(lat, lng, 59.9060, 29.8400);
+
+        if (distToMetro < distToLomonosov) {
+            setRoute('toLomonosov');
+            statusText.textContent = "Направление: В Ломоносов";
+        } else {
+            setRoute('toPiter');
+            statusText.textContent = "Направление: В Санкт-Петербург";
+        }
+        directionDetected = true;
+    }
+
+    // Ручное переключение направления
+    document.getElementById('btn-toggle-direction').addEventListener('click', () => {
+        if (currentDirection === 'toLomonosov') {
+            setRoute('toPiter');
+        } else {
+            setRoute('toLomonosov');
+        }
+    });
+
+    function setRoute(direction) {
+        currentDirection = direction;
+        activePoints = (direction === 'toLomonosov') ? ROUTE_TO_LOMONOSOV : ROUTE_TO_PITER;
+        
+        // Сбрасываем индекс на ближайшую остановку
+        findNearestPoint(); 
+        
+        drawMapRoute();
+        updateUI(true);
+        
+        document.getElementById('btn-toggle-direction').textContent = 
+            direction === 'toLomonosov' ? '🔄 Направление: В Ломоносов (нажмите чтобы сменить)' : '🔄 Направление: В Питер (нажмите чтобы сменить)';
+    }
+
+    // --- 5. ЛОГИКА КАРТЫ ---
+    function initMap() {
+        map = L.map('map', { attributionControl: false }).setView([DEFAULT_LAT, DEFAULT_LNG], 12);
+        L.yandex('yandex#map').addTo(map);
+        L.control.attribution({ prefix: '© Яндекс.Карты' }).addTo(map);
+    }
+
+    function drawMapRoute() {
+        // Удаляем старую линию и маркеры
+        if (routePolyline) map.removeLayer(routePolyline);
+        routeMarkers.forEach(m => map.removeLayer(m));
+        routeMarkers = [];
+
+        // Рисуем линию
+        const routeCoords = activePoints.map(p => [p.lat, p.lng]);
+        routePolyline = L.polyline(routeCoords, { color: '#007bff', weight: 5, opacity: 0.7 }).addTo(map);
+
+        // Рисуем маркеры
+        activePoints.forEach((p, idx) => {
+            const numberIcon = L.divIcon({
+                className: 'number-icon',
+                html: (idx + 1).toString(),
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
+                popupAnchor: [0, -12]
+            });
+            const marker = L.marker([p.lat, p.lng], { icon: numberIcon })
+                .addTo(map)
+                .bindPopup(`<b>${idx + 1}. ${p.name}</b>`);
+            routeMarkers.push(marker);
+        });
+    }
+
+    // --- 6. ЛОГИКА GPS И АУДИО ---
+    function onGpsUpdate(position) {
+        gpsAvailable = true;
+        gpsWarning.style.display = 'none';
+        currentGpsLat = position.coords.latitude; 
+        currentGpsLng = position.coords.longitude;
+
+        if (userMarker) {
+            userMarker.setLatLng([currentGpsLat, currentGpsLng]);
+        } else {
+            userMarker = L.circleMarker([currentGpsLat, currentGpsLng], { 
+                radius: 8, fillColor: '#ff0000', color: '#fff', weight: 2, fillOpacity: 1 
+            }).addTo(map).bindPopup('Вы здесь');
+        }
+
+        if (!isMapCenteredOnUser) {
+            map.setView([currentGpsLat, currentGpsLng], 15);
+            isMapCenteredOnUser = true;
+        }
+    }
+
+    function onGpsError(error) {
+        if (error.code === 1) {
+            gpsWarning.style.display = 'block';
+            statusText.textContent = 'Доступ к GPS запрещен в настройках браузера.';
+        } else if (error.code === 3) {
+            statusText.textContent = 'Поиск спутников GPS... Подождите.';
+        }
+    }
+
+    function findNearestPoint() {
+        if (activePoints.length === 0) return;
+        let minDist = Infinity;
+        let nearestIdx = currentIndex;
+        
+        activePoints.forEach((p, idx) => {
+            const d = getDistance(currentGpsLat, currentGpsLng, p.lat, p.lng);
+            if (d < minDist) { minDist = d; nearestIdx = idx; }
+        });
+        
+        // Если ближайшая точка изменилась и мы в радиусе 500м, переключаем
+        if (nearestIdx !== currentIndex && minDist <= TRIGGER_RADIUS) {
+            currentIndex = nearestIdx; 
+            updateUI(false); 
+            playAudio(currentIndex);
+            statusText.textContent = `Приближаемся: ${activePoints[currentIndex].name}`;
+        } else {
+            statusText.textContent = `Ближайшая: ${activePoints[nearestIdx].name} (${Math.round(minDist)} м)`;
+        }
+    }
+
+    function checkLocationAndPlay() {
+        if (!gpsAvailable || !isAutoMode) return;
+        findNearestPoint();
+    }
+
+    function playAudio(index) {
+        audioPlayer.pause();
+        audioPlayer.currentTime = 0;
+        
+        // Для обратного маршрута мы используем ту же нумерацию файлов (1.mp3, 2.mp3...)
+        // Если вы захотите отдельные файлы для обратного маршрута, измените путь здесь.
+        const trackNumber = index + 1;
+        audioPlayer.src = `audio/${trackNumber}.mp3`;
+        
+        audioPlayer.play().catch(e => {
+            console.warn(`Аудиофайл audio/${trackNumber}.mp3 не найден или заблокирован.`, e);
+            statusText.textContent = `Файл audio/${trackNumber}.mp3 не найден.`;
+        });
+    }
+
+    function updateUI(centerMap = false) {
+        if (activePoints.length === 0) return;
+        
+        const point = activePoints[currentIndex];
+        currentPoiText.innerHTML = `<span class="poi-title">${currentIndex + 1}. ${point.name}</span>`;
+        
+        btnPrev.disabled = (currentIndex === 0);
+        btnNext.disabled = (currentIndex === activePoints.length - 1);
+        
+        if (centerMap) {
+            map.setView([point.lat, point.lng], 15);
+        }
+    }
+
+    // Кнопки ручного переключения
+    btnNext.addEventListener('click', () => {
+        if (currentIndex < activePoints.length - 1) { 
+            isAutoMode = false; 
+            currentIndex++; 
+            updateUI(true); 
+            playAudio(currentIndex);
+        }
+    });
+
+    btnPrev.addEventListener('click', () => {
+        if (currentIndex > 0) { 
+            isAutoMode = false; 
+            currentIndex--; 
+            updateUI(true); 
+            playAudio(currentIndex);
+        }
+    });
+
+    // Вспомогательная функция расчета расстояния
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000; const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c;
+    }
+</script>
+</body>
+</html>
