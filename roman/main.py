@@ -13,8 +13,8 @@ import flet_map as ftm
 STOPS_343E = [
     {
         "name": "Ломоносов, Вокзал",
-        "lat": 59.917280, "lon": 29.769109,
-        "audio": "lomonosov.WAV",
+        "lat": 59.875730, "lon": 29.921022,
+        "audio": "lomonosov.wav",
         # Направление движения в градусах (азимут).
         # 0 = север, 90 = восток, 180 = юг, 270 = запад.
         # Если None — направление не проверяется.
@@ -23,7 +23,7 @@ STOPS_343E = [
     {
         "name": "Федюнинская улица",
         "lat": 59.902710, "lon": 29.770293,
-        "audio": "faduninskaya.WAV",
+        "audio": "faduninskaya.wav",
         "heading": 120,
     },
     # ... остальные
@@ -80,6 +80,16 @@ def main(page: ft.Page):
     content_host = ft.Container(expand=True, padding=16)
     audio_players = {}
     audio_buttons = {}
+
+    # Создаём аудиоплееры при запуске приложения
+    for stop in STOPS_343E:
+        audio = fta.Audio(
+            src=stop["audio"],
+            autoplay=False,
+            release_mode=fta.ReleaseMode.STOP,
+        )
+        page.services.append(audio)
+        audio_players[stop["name"]] = audio
     audio_paused = False
     audio_lock = asyncio.Lock()
     triggered = {stop["name"]: False for stop in STOPS_343E}
@@ -160,7 +170,7 @@ def main(page: ft.Page):
             icon=ft.Icons.PLAY_CIRCLE_FILL,
             icon_size=36,
             tooltip="Воспроизвести",
-            on_click=lambda e, s=stop: asyncio.create_task(play_audio(s)),
+            on_click=lambda e, s=stop: page.run_task(play_audio, s),
         )
         audio_buttons[stop["name"]] = play_button
 
@@ -215,10 +225,13 @@ def main(page: ft.Page):
     async def play_audio(stop):
         nonlocal current_audio, current_stop_name, audio_paused
 
-        # Не допускаем одновременную обработку нескольких быстрых нажатий/GPS.
+        print("НАЖАТИЕ КНОПКИ:", stop["name"])
+
         async with audio_lock:
             try:
-                # Повторное нажатие на текущую запись: пауза или продолжение.
+                print("ШАГ 2: вошли в аудиоблок")
+
+                # Повторное нажатие: пауза или продолжение.
                 if current_audio is not None and current_stop_name == stop["name"]:
                     if audio_paused:
                         await current_audio.resume()
@@ -228,45 +241,53 @@ def main(page: ft.Page):
                         await current_audio.pause()
                         audio_paused = True
                         log_info(f"Пауза: {stop['name']}")
+
                     update_audio_buttons()
                     return
 
-                # При выборе другой записи сначала ставим старую на паузу.
+                # Останавливаем предыдущую запись.
                 if current_audio is not None:
                     old_audio = current_audio
+                    old_name = current_stop_name
+
+                    print("ОСТАНАВЛИВАЕМ:", old_name)
                     await old_audio.pause()
+                    await asyncio.sleep(0.2)
+
                     current_audio = None
                     current_stop_name = None
                     audio_paused = False
                     update_audio_buttons()
 
-                # Создаём плеер один раз для каждой записи.
-                if stop["name"] not in audio_players:
-                    audio = fta.Audio(src=stop["audio"], autoplay=False)
-                    page.services.append(audio)
-                    audio_players[stop["name"]] = audio
-                    # Даём Flet время зарегистрировать новый service перед play().
-                    page.update()
-                    await asyncio.sleep(0.3)
-
+                # Берём заранее созданный плеер.
                 audio = audio_players[stop["name"]]
+
                 current_audio = audio
                 current_stop_name = stop["name"]
                 audio_paused = False
+
                 update_audio_buttons()
 
+                print("ЗАПУСКАЕМ:", stop["name"])
                 await audio.play()
+
+                print("ВОСПРОИЗВЕДЕНИЕ ЗАПУЩЕНО:", stop["name"])
+
                 log_info(f"Сейчас играет: {stop['name']}")
                 update_audio_buttons()
 
             except Exception as exc:
+                print("ОШИБКА ВОСПРОИЗВЕДЕНИЯ:", repr(exc))
+
                 current_audio = None
                 current_stop_name = None
                 audio_paused = False
+
                 update_audio_buttons()
+
                 show_error(
                     f"Не удалось воспроизвести «{stop['name']}». "
-                    f"Проверьте MP3 в папке assets. Подробности: {exc}"
+                    f"Подробности: {exc}"
                 )
 
     async def check_location(lat, lon, speed):
@@ -310,7 +331,7 @@ def main(page: ft.Page):
                     continue
 
             triggered[stop["name"]] = True
-            asyncio.create_task(play_audio(stop))
+            page.run_task(play_audio, stop)
             last_stop_text.value = f"Последняя остановка: {stop['name']}"
             page.update()
 
@@ -389,7 +410,7 @@ def main(page: ft.Page):
                 ft.OutlinedButton(
                     "Остановить воспроизведение",
                     icon=ft.Icons.STOP_CIRCLE_OUTLINED,
-                    on_click=lambda e: asyncio.create_task(stop_all_audio()),
+                    on_click=lambda e: page.run_task(stop_all_audio),
                     width=float("inf"),
                 ),
             ],
