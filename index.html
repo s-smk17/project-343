@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -74,9 +73,8 @@
 </div>
 
 <script>
-    // --- 1. НОВЫЕ МАССИВЫ ОСТАНОВОК (ВАШИ ТОЧНЫЕ КООРДИНАТЫ) ---
+    // --- 1. МАССИВЫ ОСТАНОВОК ---
     
-    // Направление: Ст. метро «Проспект Ветеранов» → г. Ломоносов (Вокзал)
     const ROUTE_TO_LOMONOSOV = [
         { name: "Станция метро Проспект Ветеранов", lat: 59.841925, lng: 30.251472 },
         { name: "Улица Солдата Корзуна", lat: 59.833626, lng: 30.217203 },
@@ -107,7 +105,6 @@
         { name: "Ломоносов – Вокзал", lat: 59.917927, lng: 29.767671 }
     ];
 
-    // Направление: г. Ломоносов (Вокзал) → Ст. метро «Проспект Ветеранов» (Обратный порядок)
     const ROUTE_TO_PITER = [
         { name: "Ломоносов – Вокзал", lat: 59.917927, lng: 29.767671 },
         { name: "Ломоносовская межрайонная больница", lat: 59.913697, lng: 29.767054 },
@@ -145,7 +142,7 @@
     const TRIGGER_RADIUS = 500; 
 
     let activePoints = []; 
-    let currentDirection = 'toLomonosov'; // По умолчанию начинаем от метро
+    let currentDirection = 'toLomonosov'; 
     let currentIndex = 0;
     let currentGpsLat = DEFAULT_LAT;
     let currentGpsLng = DEFAULT_LNG;
@@ -154,7 +151,6 @@
     let directionDetected = false;
 
     let map;
-    let routePolyline;
     let routeMarkers = [];
     let userPlacemark = null;
     let audioPlayer = new Audio();
@@ -198,7 +194,6 @@
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
 
-        // Расстояние до метро (начало списка) и до вокзала (конец списка)
         const distToMetro = getDistance(lat, lng, 59.841925, 30.251472);
         const distToLomonosov = getDistance(lat, lng, 59.917927, 29.767671);
 
@@ -232,21 +227,12 @@
             direction === 'toLomonosov' ? '🔄 Направление: В Ломоносов' : '🔄 Направление: В Питер';
     }
 
-    // --- 5. ОТРИСОВКА ЯНДЕКС.КАРТ ---
+    // --- 5. ОТРИСОВКА ЯНДЕКС.КАРТ (БЕЗ ЛИНИЙ) ---
     function drawMapRoute() {
         if (!map) return;
 
         map.geoObjects.removeAll();
         routeMarkers = [];
-
-        const routeCoords = activePoints.map(p => [p.lat, p.lng]);
-        
-        routePolyline = new ymaps.Polyline(routeCoords, {}, {
-            strokeColor: "#007bff",
-            strokeWidth: 5,
-            strokeOpacity: 0.7
-        });
-        map.geoObjects.add(routePolyline);
 
         activePoints.forEach((p, idx) => {
             const placemark = new ymaps.Placemark([p.lat, p.lng], {
@@ -259,6 +245,7 @@
             routeMarkers.push(placemark);
         });
         
+        // Подгоняем карту, чтобы были видны все метки
         const bounds = map.geoObjects.getBounds();
         if (bounds) {
             map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 20 });
