@@ -2,372 +2,167 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Аудиогид 343Э</title>
-    
-    <!-- Подключаем ТОЛЬКО Яндекс Карты -->
-    <script src="https://api-maps.yandex.ru/2.1/?apikey=ВАШ_API_КЛЮЧ&lang=ru_RU" type="text/javascript"></script>
-
-    <style>
-        html, body { 
-            height: 100%; 
-            margin: 0; 
-            padding: 0; 
-            font-family: sans-serif; 
-            overflow: hidden; 
-            background-color: #f4f4f4;
-        }
-        
-        #start-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #f4f4f4; z-index: 99999;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 20px; box-sizing: border-box; text-align: center;
-        }
-        #start-screen h1 { color: #007bff; margin-bottom: 10px; }
-        #start-screen p { color: #555; margin-bottom: 30px; max-width: 300px; font-size: 15px; line-height: 1.4; }
-        .start-btn {
-            padding: 15px 30px; font-size: 18px; border: none; border-radius: 50px;
-            background: #28a745; color: white; font-weight: bold;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2); cursor: pointer;
-        }
-        .start-btn:active { background: #218838; transform: scale(0.98); }
-
-        #app-container { 
-            display: none; 
-            position: fixed; 
-            top: 0; bottom: 0; left: 0; right: 0;
-            flex-direction: column; 
-            background: #fff;
-        }
-        
-        .gps-warning { 
-            background: #ffcccc; color: #900; padding: 10px; font-size: 14px; 
-            text-align: center; display: none; font-weight: bold; border-bottom: 2px solid #f00;
-            z-index: 2000; 
-            flex-shrink: 0; 
-        }
-
-        .map-wrapper { 
-            flex: 1; 
-            position: relative; 
-            width: 100%;
-            min-height: 0; 
-        }
-        
-        #map { 
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%; 
-        }
-
-        .gps-status {
-            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-            display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px;
-            font-weight: bold; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); z-index: 1500;
-            transition: all 0.3s ease;
-        }
-        .gps-status.on { background: #28a745; color: white; }
-        .gps-status.off { background: #dc3545; color: white; }
-
-        .controls { 
-            flex-shrink: 0; 
-            background: #fff; 
-            width: 100%;
-            box-sizing: border-box; 
-            z-index: 5000; 
-            position: relative;
-            box-shadow: 0 -4px 15px rgba(0,0,0,0.15); 
-            padding: 15px; 
-            padding-bottom: calc(15px + env(safe-area-inset-bottom, 10px)); 
-        }
-        
-        .btn-group { display: flex; gap: 10px; margin-bottom: 12px; }
-        button.action-btn { flex: 1; padding: 14px; font-size: 16px; border: none; border-radius: 8px; background: #007bff; color: white; font-weight: bold; }
-        button.action-btn:active { background: #0056b3; }
-        button.action-btn:disabled { background: #ccc; }
-
-        .info { text-align: center; font-size: 14px; color: #333; margin-bottom: 5px; }
-        .poi-title { font-weight: bold; color: #007bff; font-size: 17px; display: block; margin-top: 5px; }
-        .landmark-title { color: #e67e22 !important; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аудиогид 343Э (Умный поиск точек)</title>
 </head>
 <body>
-
-<div id="start-screen">
     <h1>Аудиогид 343Э</h1>
-    <p>Для работы приложения и воспроизведения аудио по GPS необходим доступ к вашему местоположению. Пожалуйста, разрешите доступ.</p>
-    <button class="start-btn" onclick="startApp()">▶ Разрешить GPS и начать</button>
-</div>
+    <p id="status">Ожидание геолокации...</p>
+    <button id="startBtn">Запустить гид (требуется для разрешения звука)</button>
 
-<div id="app-container">
-    <div id="gps-warning" class="gps-warning">
-        Местоположение выключено. Для дальнейшего использования необходимо включить GPS, иначе приложение не будет показывать ваше местоположение.
-    </div>
+    <script>
+        // 1. Список ваших остановок. Обратите внимание: id теперь с точкой!
+        // Вам нужно будет проставить реальные координаты.
+        const points = [
+            { id: 1.0,  name: "Ломоносов – Вокзал", lat: 59.9145, lon: 29.7720 },
+            { id: 2.0,  name: "Ломоносовская межрайонная больница", lat: 59.9080, lon: 29.7800 },
+            { id: 12.0, name: "Улица Связи (пример)", lat: 59.8900, lon: 29.8000 },
+            { id: 12.1, name: "Новогорская улица (пример)", lat: 59.8850, lon: 29.8100 },
+            { id: 12.5, name: "Улица Жоры Антоненко (пример)", lat: 59.8800, lon: 29.8200 }, // <- Для этого сработает файл 0125
+            { id: 12.8, name: "Мордвиновка (пример)", lat: 59.8750, lon: 29.8300 },
+            { id: 30.0, name: "Станция метро Проспект Ветеранов", lat: 59.8480, lon: 30.1600 }
+        ];
 
-    <div class="map-wrapper">
-        <div id="map"></div>
-        <div id="gps-status" class="gps-status on">
-            <span id="gps-icon"></span>
-            <span id="gps-label">GPS включен</span>
-        </div>
-    </div>
+        // 2. Ваши аудиофайлы
+        const audioFiles = [
+            "01.mp3", 
+            "02.mp3", 
+            "012.mp3",  // сработает для 12.0
+            "0125.mp3", // сработает для 12.5 (так как 12.5 есть в списке)
+            "0129.mp3", // 12.9 нет в списке, сработает для ближайшей (12.8)
+            "030.mp3"
+        ];
 
-    <div class="controls">
-        <div class="btn-group">
-            <button id="btn-prev" class="action-btn" disabled>◀ Назад</button>
-            <button id="btn-next" class="action-btn" disabled>Вперед ▶</button>
-        </div>
-        
-        <div class="info" id="status-text">Ожидание GPS...</div>
-        <div class="info">
-            <span id="current-poi">Текущая: —</span>
-        </div>
-    </div>
-</div>
-
-<script>
-    const POINTS = [
-        { num: "1", name: "Станция метро Проспект Ветеранов", lat: 59.841925, lng: 30.251472 },
-        { num: "2", name: "Улица Солдата Корзуна", lat: 59.833626, lng: 30.217203 },
-        { num: "3", name: "Проспект Маршала Жукова", lat: 59.833122, lng: 30.196659 },
-        { num: "4", name: "Авангардная улица", lat: 59.833096, lng: 30.181858 },
-        { num: "5", name: "Улица Пограничника Гарькавого", lat: 59.835494, lng: 30.146030 },
-        { num: "6", name: "Улица Пионерстроя", lat: 59.835505, lng: 30.128085 },
-        { num: "7", name: "Рогачёвский переулок", lat: 59.841970, lng: 30.130531 },
-        { num: "8", name: "Проспект Будённого", lat: 59.852752, lng: 30.089369 },
-        { num: "8.5", name: "Константиновский дворец", lat: 59.851541, lng: 30.058099, isLandmark: true },
-        { num: "9", name: "Фронтовая улица", lat: 59.852910, lng: 30.036047 },
-        { num: "10", name: "Кропоткинская улица", lat: 59.854896, lng: 30.020567 },
-        { num: "11", name: "Улица Крылова", lat: 59.858147, lng: 30.004907 },
-        { num: "12", name: "Константиновская улица – Николаевская больница", lat: 59.878519, lng: 29.920103 },
-        // ОБНОВЛЕНЫ КООРДИНАТЫ ДЛЯ 12.5
-        { num: "12.5", name: "Фонтаны", lat: 59.880442, lng: 29.906564, isLandmark: true },
-        { num: "13", name: "Разводная улица", lat: 59.880977, lng: 29.902956 },
-        { num: "14", name: "Фабричная улица", lat: 59.883181, lng: 29.889367 },
-        { num: "15", name: "Посёлок Просвещения", lat: 59.894253, lng: 29.861075 },
-        { num: "16", name: "Мордвиновка", lat: 59.899376, lng: 29.827707 },
-        { num: "17", name: "Новогорская улица", lat: 59.899998, lng: 29.814455 },
-        { num: "18", name: "Улица Связи", lat: 59.897904, lng: 29.807719 },
-        { num: "19", name: "Улица Федюнинского", lat: 59.894654, lng: 29.796321 },
-        { num: "20", name: "Ораниенбаумский проспект / Улица Федюнинского, 31", lat: 59.900046, lng: 29.777662 },
-        { num: "21", name: "Улица Федюнинского / Улица Победы", lat: 59.903017, lng: 29.770512 },
-        { num: "22", name: "Швейцарская улица / Улица Победы", lat: 59.906088, lng: 29.772622 },
-        { num: "23", name: "Красноармейская улица", lat: 59.907723, lng: 29.774272 },
-        { num: "24", name: "Александровская улица", lat: 59.909975, lng: 29.774892 },
-        { num: "25", name: "Ломоносов – Владимирская улица", lat: 59.910435, lng: 29.769417 },
-        { num: "26", name: "Ломоносовская межрайонная больница", lat: 59.913697, lng: 29.767054 },
-        { num: "27", name: "Ломоносов – Вокзал", lat: 59.917927, lng: 29.767671 }
-    ];
-
-    const DEFAULT_LAT = 59.841925; 
-    const DEFAULT_LNG = 30.251472;
-    const CHECK_INTERVAL = 10000; 
-    const TRIGGER_RADIUS = 500; 
-
-    let currentIndex = 0;
-    let currentGpsLat = DEFAULT_LAT;
-    let currentGpsLng = DEFAULT_LNG;
-    let gpsAvailable = false;
-    let isAutoMode = true;
-
-    let map;
-    let routeMarkers = [];
-    let userPlacemark = null;
-    let audioPlayer = new Audio();
-    
-    const statusText = document.getElementById('status-text');
-    const currentPoiText = document.getElementById('current-poi');
-    const btnPrev = document.getElementById('btn-prev');
-    const btnNext = document.getElementById('btn-next');
-    const gpsWarning = document.getElementById('gps-warning');
-    const gpsStatusBar = document.getElementById('gps-status');
-    const gpsIcon = document.getElementById('gps-icon');
-    const gpsLabel = document.getElementById('gps-label');
-
-    const svgGpsOn = `<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
-    const svgGpsOff = `<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/><line x1="1" y1="1" x2="23" y2="23" stroke="white" stroke-width="3"/></svg>`;
-
-    function startApp() {
-        document.getElementById('start-screen').style.display = 'none';
-        document.getElementById('app-container').style.display = 'flex';
-
-        ymaps.ready(() => {
-            map = new ymaps.Map("map", {
-                center: [DEFAULT_LAT, DEFAULT_LNG],
-                zoom: 10,
-                controls: ['zoomControl']
-            });
-
-            drawMapRoute();
-            updateUI(false);
+        // Функция преобразования имени файла в ID: "0125" -> 12.5
+        function parseFileNameToId(fileName) {
+            let numStr = fileName.split('.')[0]; // Берем "0125"
             
-            setTimeout(() => {
-                if (map) map.container.fitToViewport();
-            }, 300);
-        });
-
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(onFirstGps, onGpsError, { enableHighAccuracy: true, timeout: 10000 });
-            navigator.geolocation.watchPosition(onGpsUpdate, onGpsError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
-        } else { 
-            onGpsError({ code: 1 }); 
-        }
-
-        setInterval(checkLocationAndPlay, CHECK_INTERVAL);
-    }
-
-    function drawMapRoute() {
-        if (!map) return;
-        map.geoObjects.removeAll();
-        routeMarkers = [];
-
-        POINTS.forEach((p, idx) => {
-            let iconPreset = p.isLandmark ? "islands#orangeIcon" : "islands#blueIcon";
-
-            const placemark = new ymaps.Placemark([p.lat, p.lng], {
-                iconContent: p.num,
-                balloonContent: `<b>${p.num}. ${p.name}</b>`,
-                hintContent: p.name
-            }, {
-                preset: iconPreset
-            });
-
-            placemark.events.add('click', function () {
-                isAutoMode = false;      
-                currentIndex = idx;      
-                updateUI(true);          
-                playAudio(currentIndex); 
-            });
-
-            map.geoObjects.add(placemark);
-            routeMarkers.push(placemark);
-        });
-        
-        const bounds = map.geoObjects.getBounds();
-        if (bounds) {
-            map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 20 });
-        }
-    }
-
-    function onFirstGps(position) {
-        findNearestPoint(position.coords.latitude, position.coords.longitude);
-    }
-
-    function onGpsUpdate(position) {
-        gpsAvailable = true;
-        gpsWarning.style.display = 'none';
-        gpsStatusBar.className = 'gps-status on';
-        gpsIcon.innerHTML = svgGpsOn;
-        gpsLabel.textContent = "GPS включен";
-
-        currentGpsLat = position.coords.latitude; 
-        currentGpsLng = position.coords.longitude;
-
-        if (map) {
-            if (userPlacemark) {
-                userPlacemark.geometry.setCoordinates([currentGpsLat, currentGpsLng]);
-            } else {
-                userPlacemark = new ymaps.Placemark([currentGpsLat, currentGpsLng], {
-                    hintContent: 'Вы здесь'
-                }, {
-                    preset: 'islands#redDotIcon'
-                });
-                map.geoObjects.add(userPlacemark);
+            // Убираем ведущий ноль
+            if (numStr.startsWith('0')) {
+                numStr = numStr.substring(1);
             }
+            
+            // Если осталась одна цифра, добавляем .0 (например "01" -> "1" -> 1.0)
+            if (numStr.length === 1) {
+                return parseFloat(numStr + ".0");
+            }
+
+            // Вставляем точку перед последней цифрой: "125" -> "12.5"
+            if (numStr.length > 1) {
+                numStr = numStr.slice(0, -1) + '.' + numStr.slice(-1);
+            }
+            
+            return parseFloat(numStr);
         }
-    }
 
-    function onGpsError(error) {
-        gpsAvailable = false;
-        gpsStatusBar.className = 'gps-status off';
-        gpsIcon.innerHTML = svgGpsOff;
-        gpsLabel.textContent = "GPS выключен";
+        // Функция умного поиска точки
+        function findBestPointMatch(targetId, allPoints) {
+            // 1. Ищем точное совпадение
+            let exactMatch = allPoints.find(p => p.id === targetId);
+            if (exactMatch) return { point: exactMatch, matchType: 'точное' };
 
-        if (error.code === 1) { 
-            gpsWarning.style.display = 'block';
-            statusText.textContent = 'Ожидание доступа к GPS...';
-        } else if (error.code === 3) { 
-            statusText.textContent = 'Поиск спутников GPS... Подождите.';
+            // 2. Ищем точки с такой же целой частью (например, для 12.9 ищем среди 12.x)
+            let integerPart = Math.floor(targetId);
+            let sameIntegerPoints = allPoints.filter(p => Math.floor(p.id) === integerPart);
+            
+            if (sameIntegerPoints.length > 0) {
+                // Сортируем по разнице и берем самую близкую
+                sameIntegerPoints.sort((a, b) => Math.abs(a.id - targetId) - Math.abs(b.id - targetId));
+                return { point: sameIntegerPoints[0], matchType: 'похожая (та же целая часть)' };
+            }
+
+            // 3. Если вообще ничего нет, ищем математически ближайшую точку на маршруте
+            if (allPoints.length > 0) {
+                let sortedAll = [...allPoints].sort((a, b) => Math.abs(a.id - targetId) - Math.abs(b.id - targetId));
+                return { point: sortedAll[0], matchType: 'ближайшая по номеру' };
+            }
+
+            return null;
         }
-    }
 
-    function playAudio(index) {
-        audioPlayer.pause();
-        audioPlayer.currentTime = 0;
-        
-        const point = POINTS[index];
-        const audioPath = `audio/${point.num}.mp3`; 
-
-        audioPlayer.src = audioPath;
-        audioPlayer.play().catch(e => {
-            console.warn(`Аудиофайл ${audioPath} не найден.`, e);
-            statusText.textContent = `Файл ${audioPath} не найден.`;
+        // Создаем карту аудиофайлов с учетом умного поиска
+        const audioMap = {};
+        audioFiles.forEach(file => {
+            const parsedId = parseFileNameToId(file);
+            const matchResult = findBestPointMatch(parsedId, points);
+            
+            if (matchResult && matchResult.point) {
+                // Если для этой точки уже есть файл, не перезаписываем его (приоритет точного совпадения)
+                if (!audioMap[matchResult.point.id]) {
+                    audioMap[matchResult.point.id] = {
+                        file: file,
+                        originalId: parsedId,
+                        matchType: matchResult.matchType
+                    };
+                    console.log(`Файл ${file} (ID ${parsedId}) привязан к точке ${matchResult.point.id} (${matchResult.matchType})`);
+                }
+            }
         });
-    }
 
-    function findNearestPoint(lat = currentGpsLat, lng = currentGpsLng) {
-        if (POINTS.length === 0 || !isAutoMode) return; 
-        
-        let minDist = Infinity;
-        let nearestIdx = currentIndex;
-        
-        POINTS.forEach((p, idx) => {
-            const d = getDistance(lat, lng, p.lat, p.lng);
-            if (d < minDist) { minDist = d; nearestIdx = idx; }
+        // Дальше - стандартная логика геолокации
+        const RADIUS_METERS = 50; 
+        let lastPlayedPointId = null;
+        let currentAudio = new Audio();
+        let isStarted = false;
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; 
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        function startTracking() {
+            if (!navigator.geolocation) return;
+
+            navigator.geolocation.watchPosition((position) => {
+                const userLat = position.coords.latitude;
+                const userLon = position.coords.longitude;
+
+                points.forEach(point => {
+                    const distance = getDistance(userLat, userLon, point.lat, point.lon);
+
+                    if (distance <= RADIUS_METERS && lastPlayedPointId !== point.id) {
+                        const audioData = audioMap[point.id];
+
+                        if (audioData) {
+                            document.getElementById('status').innerText = `Точка ${point.id} (${audioData.matchType}). Играет: ${audioData.file}`;
+                            
+                            currentAudio.pause();
+                            currentAudio.src = audioData.file;
+                            currentAudio.play().catch(e => console.error("Ошибка звука:", e));
+
+                            lastPlayedPointId = point.id; 
+                            
+                            setTimeout(() => {
+                                if (lastPlayedPointId === point.id) lastPlayedPointId = null;
+                            }, 120000); // Сброс через 2 минуты
+                        }
+                    }
+                });
+            }, (error) => {
+                document.getElementById('status').innerText = "Ошибка GPS: " + error.message;
+            }, {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 5000
+            });
+        }
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!isStarted) {
+                currentAudio.play().catch(() => {});
+                isStarted = true;
+                startTracking();
+                document.getElementById('startBtn').style.display = 'none';
+            }
         });
-        
-        if (nearestIdx !== currentIndex && minDist <= TRIGGER_RADIUS) {
-            currentIndex = nearestIdx; 
-            updateUI(false); 
-            playAudio(currentIndex);
-            statusText.textContent = `Приближаемся: ${POINTS[currentIndex].name}`;
-        } else {
-            statusText.textContent = `Ближайшая точка: ${POINTS[nearestIdx].name} (${Math.round(minDist)} м)`;
-        }
-    }
-
-    function checkLocationAndPlay() {
-        if (!gpsAvailable || !isAutoMode) return;
-        findNearestPoint();
-    }
-
-    function updateUI(centerMap = false) {
-        if (POINTS.length === 0) return;
-        
-        const point = POINTS[currentIndex];
-
-        if (point.isLandmark) {
-            currentPoiText.innerHTML = `<span class="poi-title landmark-title">★ ${point.num} — ${point.name}</span>`;
-        } else {
-            currentPoiText.innerHTML = `<span class="poi-title">${point.num}. ${point.name}</span>`;
-        }
-        
-        btnPrev.disabled = (currentIndex === 0);
-        btnNext.disabled = (currentIndex === POINTS.length - 1);
-        
-        if (centerMap && map) {
-            map.setCenter([point.lat, point.lng], 15);
-        }
-    }
-
-    btnNext.addEventListener('click', () => {
-        if (currentIndex < POINTS.length - 1) { 
-            isAutoMode = false; currentIndex++; updateUI(true); playAudio(currentIndex);
-        }
-    });
-
-    btnPrev.addEventListener('click', () => {
-        if (currentIndex > 0) { 
-            isAutoMode = false; currentIndex--; updateUI(true); playAudio(currentIndex);
-        }
-    });
-
-    function getDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371000; const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c;
-    }
-</script>
+    </script>
 </body>
 </html>
