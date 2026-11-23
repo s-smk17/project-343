@@ -149,7 +149,7 @@
         setInterval(checkLocationAndPlay, CHECK_INTERVAL);
     }
 
-    // --- 4. ОТРИСОВКА КАРТЫ ---
+    // --- 4. ОТРИСОВКА КАРТЫ С ОБРАБОТЧИКОМ КЛИКОВ ---
     function drawMapRoute() {
         if (!map) return;
 
@@ -163,6 +163,15 @@
             }, {
                 preset: 'islands#blueStretchyIcon'
             });
+
+            // ДОБАВЛЯЕМ ОБРАБОТЧИК КЛИКА НА МАРКЕР
+            placemark.events.add('click', function (e) {
+                isAutoMode = false;      // Отключаем авто-переключение по GPS, раз пользователь выбрал вручную
+                currentIndex = idx;      // Устанавливаем индекс на выбранную точку
+                updateUI(true);          // Обновляем нижнюю панель и центрируем карту
+                playAudio(currentIndex); // Включаем аудио
+            });
+
             map.geoObjects.add(placemark);
             routeMarkers.push(placemark);
         });
@@ -175,10 +184,8 @@
 
     // --- 5. ЛОГИКА GPS ---
     function onFirstGps(position) {
-        // Первичная проверка, чтобы сразу центрировать карту на пользователе, если он рядом
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-        // Автоматически находим ближайшую точку при старте
         findNearestPoint(lat, lng);
     }
 
@@ -213,7 +220,8 @@
 
     // --- 6. АУДИО И ПЕРЕКЛЮЧЕНИЕ ---
     function findNearestPoint(lat = currentGpsLat, lng = currentGpsLng) {
-        if (POINTS.length === 0) return;
+        if (POINTS.length === 0 || !isAutoMode) return; 
+        
         let minDist = Infinity;
         let nearestIdx = currentIndex;
         
