@@ -83,21 +83,42 @@
         }
         
         /* Обновленный блок кнопок */
-        .btn-group { display: flex; gap: 10px; margin-bottom: 12px; }
-        button.action-btn { flex: 1; padding: 14px; font-size: 16px; border: none; border-radius: 8px; background: #007bff; color: white; font-weight: bold; }
+        .btn-group { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 12px; 
+            align-items: stretch; /* Кнопки выравниваются по высоте */
+        }
+        
+        button.action-btn { 
+            flex: 1; 
+            padding: 14px; 
+            font-size: 16px; 
+            border: none; 
+            border-radius: 8px; 
+            background: #007bff; 
+            color: white; 
+            font-weight: bold; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
         button.action-btn:active { background: #0056b3; }
         button.action-btn:disabled { background: #ccc; }
 
-        /* Кнопка "Найти меня" */
+        /* НОВАЯ КНОПКА ПРИЦЕЛА */
         #btn-locate { 
-            flex: 0.5; /* Она будет чуть уже, чем кнопки навигации */
-            background: #28a745; 
-            font-size: 20px; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            flex: 0 0 56px; /* Фиксированная ширина 56px, чтобы не сжималась */
+            background: #fff; 
+            border: 2px solid #007bff;
+            padding: 0;
         }
-        #btn-locate:active { background: #218838; }
+        #btn-locate:active { background: #e6f0ff; }
+        #btn-locate svg {
+            width: 28px;
+            height: 28px;
+            fill: #007bff;
+        }
 
         .info { text-align: center; font-size: 14px; color: #333; margin-bottom: 5px; }
         .poi-title { font-weight: bold; color: #007bff; font-size: 17px; display: block; margin-top: 5px; }
@@ -128,8 +149,16 @@
     <div class="controls">
         <div class="btn-group">
             <button id="btn-prev" class="action-btn" disabled>◀ Назад</button>
-            <!-- НОВАЯ КНОПКА "ГДЕ Я" -->
-            <button id="btn-locate" class="action-btn" title="Показать меня на карте">📍</button>
+            
+            <!-- КНОПКА ПРИЦЕЛА С SVG ИКОНКОЙ -->
+            <button id="btn-locate" class="action-btn" title="Показать меня на карте">
+                <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="8" stroke="#007bff" stroke-width="2" fill="none"/>
+                    <circle cx="12" cy="12" r="3" fill="#007bff"/>
+                    <path d="M12 2v3m0 14v3M2 12h3m14 0h3" stroke="#007bff" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </button>
+            
             <button id="btn-next" class="action-btn" disabled>Вперед ▶</button>
         </div>
         
