@@ -82,7 +82,6 @@
             padding-bottom: calc(15px + env(safe-area-inset-bottom, 10px)); 
         }
         
-        /* Группа кнопок */
         .btn-group { 
             display: flex; 
             gap: 10px; 
@@ -109,9 +108,8 @@
         button.action-btn:active { background: #0056b3; }
         button.action-btn:disabled { background: #ccc; }
 
-        /* Кнопка "Найти меня" со стрелкой */
         #btn-locate { 
-            flex: 0 0 54px; /* Жесткая ширина */
+            flex: 0 0 54px; 
             min-width: 54px;
             background: #fff; 
             border: 2px solid #007bff;
@@ -156,10 +154,8 @@
         <div class="btn-group">
             <button id="btn-prev" class="action-btn" disabled>◀ Назад</button>
             
-            <!-- НОВАЯ КНОПКА СО СТРЕЛКОЙ ВВЕРХ -->
             <button id="btn-locate" class="action-btn" title="Найти меня">
                 <svg viewBox="0 0 24 24">
-                    <!-- Векторная стрелка вверх -->
                     <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
                 </svg>
             </button>
@@ -175,42 +171,45 @@
 </div>
 
 <script>
+    // Базовый URL для raw-файлов GitHub
+    const AUDIO_BASE_URL = "https://raw.githubusercontent.com/s-smk17/project-343/main/fedor_andrey/";
+
     const POINTS = [
-        { num: "1", name: "Станция метро Проспект Ветеранов", lat: 59.841925, lng: 30.251472 },
-        { num: "2", name: "Улица Солдата Корзуна", lat: 59.833626, lng: 30.217203 },
-        { num: "3", name: "Проспект Маршала Жукова", lat: 59.833122, lng: 30.196659 },
-        { num: "4", name: "Авангардная улица", lat: 59.833096, lng: 30.181858 },
-        { num: "5", name: "Улица Пограничника Гарькавого", lat: 59.835494, lng: 30.146030 },
-        { num: "6", name: "Улица Пионерстроя", lat: 59.835505, lng: 30.128085 },
-        { num: "7", name: "Рогачёвский переулок", lat: 59.841970, lng: 30.130531 },
-        { num: "8", name: "Проспект Будённого", lat: 59.852752, lng: 30.089369 },
-        { num: "8.5", name: "Константиновский дворец", lat: 59.851541, lng: 30.058099, isLandmark: true },
-        { num: "9", name: "Фронтовая улица", lat: 59.852910, lng: 30.036047 },
-        { num: "10", name: "Кропоткинская улица", lat: 59.854896, lng: 30.020567 },
-        { num: "11", name: "Улица Крылова", lat: 59.858147, lng: 30.004907 },
-        { num: "12", name: "Константиновская улица – Николаевская больница", lat: 59.878519, lng: 29.920103 },
-        { num: "12.5", name: "Фонтаны", lat: 59.880442, lng: 29.906564, isLandmark: true },
-        { num: "13", name: "Разводная улица", lat: 59.880977, lng: 29.902956 },
-        { num: "14", name: "Фабричная улица", lat: 59.883181, lng: 29.889367 },
-        { num: "15", name: "Посёлок Просвещения", lat: 59.894253, lng: 29.861075 },
-        { num: "16", name: "Мордвиновка", lat: 59.899376, lng: 29.827707 },
-        { num: "17", name: "Новогорская улица", lat: 59.899998, lng: 29.814455 },
-        { num: "18", name: "Улица Связи", lat: 59.897904, lng: 29.807719 },
-        { num: "19", name: "Улица Федюнинского", lat: 59.894654, lng: 29.796321 },
-        { num: "20", name: "Ораниенбаумский проспект / Улица Федюнинского, 31", lat: 59.900046, lng: 29.777662 },
-        { num: "21", name: "Улица Федюнинского / Улица Победы", lat: 59.903017, lng: 29.770512 },
-        { num: "22", name: "Швейцарская улица / Улица Победы", lat: 59.906088, lng: 29.772622 },
-        { num: "23", name: "Красноармейская улица", lat: 59.907723, lng: 29.774272 },
-        { num: "24", name: "Александровская улица", lat: 59.909975, lng: 29.774892 },
-        { num: "25", name: "Ломоносов – Владимирская улица", lat: 59.910435, lng: 29.769417 },
-        { num: "26", name: "Ломоносовская межрайонная больница", lat: 59.913697, lng: 29.767054 },
-        { num: "27", name: "Ломоносов – Вокзал", lat: 59.917927, lng: 29.767671 }
+        { num: "1", name: "Станция метро Проспект Ветеранов", lat: 59.841925, lng: 30.251472, audioFile: null },
+        { num: "2", name: "Улица Солдата Корзуна", lat: 59.833626, lng: 30.217203, audioFile: null },
+        { num: "3", name: "Проспект Маршала Жукова", lat: 59.833122, lng: 30.196659, audioFile: null },
+        { num: "4", name: "Авангардная улица", lat: 59.833096, lng: 30.181858, audioFile: null },
+        { num: "5", name: "Улица Пограничника Гарькавого", lat: 59.835494, lng: 30.146030, audioFile: null },
+        { num: "6", name: "Улица Пионерстроя", lat: 59.835505, lng: 30.128085, audioFile: null },
+        { num: "7", name: "Рогачёвский переулок", lat: 59.841970, lng: 30.130531, audioFile: null },
+        { num: "8", name: "Проспект Будённого", lat: 59.852752, lng: 30.089369, audioFile: "08 начало о проекте, проспект Буденного.mp3" },
+        { num: "8.5", name: "Константиновский дворец", lat: 59.851541, lng: 30.058099, isLandmark: true, audioFile: "08.5 продолжение Константиновский дворец).mp3" },
+        { num: "9", name: "Фронтовая улица", lat: 59.852910, lng: 30.036047, audioFile: "09 Фронтовая улица.mp3" },
+        { num: "10", name: "Кропоткинская улица", lat: 59.854896, lng: 30.020567, audioFile: null },
+        { num: "11", name: "Улица Крылова", lat: 59.858147, lng: 30.004907, audioFile: "11 остановка от ул. Крылова до Николаевской больницы.mp3" },
+        { num: "12", name: "Константиновская улица – Николаевская больница", lat: 59.878519, lng: 29.920103, audioFile: "12 Николаевская больница.mp3" },
+        { num: "12.5", name: "Фонтаны", lat: 59.880442, lng: 29.906564, isLandmark: true, audioFile: "12.5 о Фонтанах (до Разводной улицы).mp3" },
+        { num: "13", name: "Разводная улица", lat: 59.880977, lng: 29.902956, audioFile: "13 остановка О часовом заводе Ракета (от Разводной до Фабричной).mp3" },
+        { num: "14", name: "Фабричная улица", lat: 59.883181, lng: 29.889367, audioFile: "14 остановка Фабричная улица.mp3" },
+        { num: "15", name: "Посёлок Просвещения", lat: 59.894253, lng: 29.861075, audioFile: "15 остановка Мордвиновка.mp3" },
+        { num: "16", name: "Мордвиновка", lat: 59.899376, lng: 29.827707, audioFile: "16 остановка Новогорская улица.mp3" },
+        { num: "17", name: "Новогорская улица", lat: 59.899998, lng: 29.814455, audioFile: "17 остановка Ул. Связи.mp3" },
+        { num: "18", name: "Улица Связи", lat: 59.897904, lng: 29.807719, audioFile: "18 остановка ул. Федюнинского.mp3" },
+        { num: "19", name: "Улица Федюнинского", lat: 59.894654, lng: 29.796321, audioFile: "19 остановка Ораниенбаумский проспект.mp3" },
+        { num: "20", name: "Ораниенбаумский проспект / Улица Федюнинского, 31", lat: 59.900046, lng: 29.777662, audioFile: "20 ост ул Федюнинского-ул Победы.mp3" },
+        { num: "21", name: "Улица Федюнинского / Улица Победы", lat: 59.903017, lng: 29.770512, audioFile: "21 остановка Швейцарская ул - Победы.mp3" },
+        { num: "22", name: "Швейцарская улица / Улица Победы", lat: 59.906088, lng: 29.772622, audioFile: "22 остановка Красноармейская ул.mp3" },
+        { num: "23", name: "Красноармейская улица", lat: 59.907723, lng: 29.774272, audioFile: "23 остановка Александровская улица.mp3" },
+        { num: "24", name: "Александровская улица", lat: 59.909975, lng: 29.774892, audioFile: "24 остановка Владимирская улица.mp3" },
+        { num: "25", name: "Ломоносов – Владимирская улица", lat: 59.910435, lng: 29.769417, audioFile: "25 остановка Межрайонная Ломоносовская больница.mp3" },
+        { num: "26", name: "Ломоносовская межрайонная больница", lat: 59.913697, lng: 29.767054, audioFile: "26 остановка Рынок.mp3" },
+        { num: "27", name: "Ломоносов – Вокзал", lat: 59.917927, lng: 29.767671, audioFile: "27 остановка Ломоносов, вокзал.mp3" }
     ];
 
     const DEFAULT_LAT = 59.841925; 
     const DEFAULT_LNG = 30.251472;
     const CHECK_INTERVAL = 10000; 
-    const TRIGGER_RADIUS = 500; 
+    const TRIGGER_RADIUS = 100; // Изменено на 100 метров
 
     let currentIndex = 0;
     let currentGpsLat = DEFAULT_LAT;
@@ -265,7 +264,6 @@
         setInterval(checkLocationAndPlay, CHECK_INTERVAL);
     }
 
-    // Обработчик кнопки "Найти меня"
     btnLocate.addEventListener('click', () => {
         if (gpsAvailable && map) {
             map.panTo([currentGpsLat, currentGpsLng], {
@@ -354,16 +352,23 @@
     }
 
     function playAudio(index) {
+        const point = POINTS[index];
+        if (!point.audioFile) {
+            statusText.textContent = `Для точки ${point.num} аудио не найдено.`;
+            return;
+        }
+
         audioPlayer.pause();
         audioPlayer.currentTime = 0;
         
-        const point = POINTS[index];
-        const audioPath = `audio/${point.num}.mp3`; 
+        // Формируем полный URL с кодированием пробелов и спецсимволов
+        const encodedFileName = encodeURIComponent(point.audioFile);
+        const audioUrl = AUDIO_BASE_URL + encodedFileName;
 
-        audioPlayer.src = audioPath;
+        audioPlayer.src = audioUrl;
         audioPlayer.play().catch(e => {
-            console.warn(`Аудиофайл ${audioPath} не найден.`, e);
-            statusText.textContent = `Файл ${audioPath} не найден.`;
+            console.warn(`Не удалось воспроизвести аудио: ${audioUrl}`, e);
+            statusText.textContent = `Ошибка загрузки аудио для точки ${point.num}.`;
         });
     }
 
