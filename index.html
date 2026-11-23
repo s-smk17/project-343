@@ -11,7 +11,6 @@
     <style>
         body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; }
         
-        /* Экран приветствия для запроса GPS */
         #start-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #f4f4f4; z-index: 9999;
@@ -27,35 +26,21 @@
         }
         .start-btn:active { background: #218838; transform: scale(0.98); }
 
-        /* Основной интерфейс */
         #app-container { display: none; height: 100vh; flex-direction: column; }
         
-        /* Баннер с ошибкой GPS */
         .gps-warning { 
             background: #ffcccc; color: #900; padding: 10px; font-size: 14px; 
             text-align: center; display: none; font-weight: bold; border-bottom: 2px solid #f00;
             z-index: 2000; position: relative;
         }
 
-        /* Обертка для карты, чтобы позиционировать плашку GPS поверх */
         .map-wrapper { position: relative; flex: 1; display: flex; flex-direction: column; }
         #map { flex: 1; width: 100%; }
 
-        /* Индикатор GPS */
         .gps-status {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 13px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            z-index: 1000;
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+            display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px;
+            font-weight: bold; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); z-index: 1000;
             transition: all 0.3s ease;
         }
         .gps-status.on { background: #28a745; color: white; }
@@ -69,6 +54,7 @@
 
         .info { text-align: center; font-size: 13px; color: #333; margin-bottom: 5px; }
         .poi-title { font-weight: bold; color: #007bff; font-size: 16px; display: block; margin-top: 5px; }
+        .landmark-title { color: #e67e22 !important; } /* Оранжевый цвет для достопримечательности */
     </style>
 </head>
 <body>
@@ -80,19 +66,14 @@
 </div>
 
 <div id="app-container">
-    <!-- Сообщение при выключенном GPS -->
     <div id="gps-warning" class="gps-warning">
         Местоположение выключено. Для дальнейшего использования необходимо включить GPS, иначе приложение не будет показывать ваше местоположение.
     </div>
 
-    <!-- Обертка карты с плавающим индикатором -->
     <div class="map-wrapper">
         <div id="map"></div>
         <div id="gps-status" class="gps-status on">
-            <span id="gps-icon">
-                <!-- Иконка включенного GPS -->
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-            </span>
+            <span id="gps-icon"></span>
             <span id="gps-label">GPS включен</span>
         </div>
     </div>
@@ -111,7 +92,8 @@
 </div>
 
 <script>
-    // --- 1. ЕДИНСТВЕННЫЙ МАРШРУТ (Питер -> Ломоносов) ---
+    // --- 1. МАРШРУТ С ДОСТОПРИМЕЧАТЕЛЬНОСТЬЮ ---
+    // Добавлено свойство isLandmark: true и audioFile для неё
     const POINTS = [
         { name: "Станция метро Проспект Ветеранов", lat: 59.841925, lng: 30.251472 },
         { name: "Улица Солдата Корзуна", lat: 59.833626, lng: 30.217203 },
@@ -121,6 +103,8 @@
         { name: "Улица Пионерстроя", lat: 59.835505, lng: 30.128085 },
         { name: "Рогачёвский переулок", lat: 59.841970, lng: 30.130531 },
         { name: "Проспект Будённого", lat: 59.852752, lng: 30.089369 },
+        // ВСТАВЛЕНА ДОСТОПРИМЕЧАТЕЛЬНОСТЬ
+        { name: "Константиновский дворец", lat: 59.851541, lng: 30.058099, isLandmark: true, audioFile: "audio/landmark.mp3" },
         { name: "Фронтовая улица", lat: 59.852910, lng: 30.036047 },
         { name: "Кропоткинская улица", lat: 59.854896, lng: 30.020567 },
         { name: "Улица Крылова", lat: 59.858147, lng: 30.004907 },
@@ -142,7 +126,6 @@
         { name: "Ломоносов – Вокзал", lat: 59.917927, lng: 29.767671 }
     ];
 
-    // --- 2. ПЕРЕМЕННЫЕ ---
     const DEFAULT_LAT = 59.841925; 
     const DEFAULT_LNG = 30.251472;
     const CHECK_INTERVAL = 10000; 
@@ -168,11 +151,9 @@
     const gpsIcon = document.getElementById('gps-icon');
     const gpsLabel = document.getElementById('gps-label');
 
-    // SVG иконки для GPS
     const svgGpsOn = `<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
     const svgGpsOff = `<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/><line x1="1" y1="1" x2="23" y2="23" stroke="white" stroke-width="3"/></svg>`;
 
-    // --- 3. ЗАПУСК ---
     function startApp() {
         document.getElementById('start-screen').style.display = 'none';
         document.getElementById('app-container').style.display = 'flex';
@@ -192,25 +173,39 @@
             navigator.geolocation.getCurrentPosition(onFirstGps, onGpsError, { enableHighAccuracy: true, timeout: 10000 });
             navigator.geolocation.watchPosition(onGpsUpdate, onGpsError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
         } else { 
-            onGpsError({ code: 1 }); // Вызываем ошибку, если API не поддерживается
+            onGpsError({ code: 1 }); 
         }
 
         setInterval(checkLocationAndPlay, CHECK_INTERVAL);
     }
 
-    // --- 4. ОТРИСОВКА КАРТЫ ---
+    // --- ОТРИСОВКА КАРТЫ (С УЧЕТОМ ДОСТОПРИМЕЧАТЕЛЬНОСТЕЙ) ---
     function drawMapRoute() {
         if (!map) return;
-
         map.geoObjects.removeAll();
         routeMarkers = [];
 
+        let stopCounter = 0; // Отдельный счетчик для остановок
+
         POINTS.forEach((p, idx) => {
+            let iconText = "";
+            let iconPreset = "islands#blueStretchyIcon";
+
+            if (p.isLandmark) {
+                // Достопримечательность: звездочка, без номера, оранжевый цвет
+                iconText = `★ ${p.name}`;
+                iconPreset = "islands#orangeStretchyIcon";
+            } else {
+                // Обычная остановка: увеличиваем счетчик и ставим номер
+                stopCounter++;
+                iconText = `${stopCounter}. ${p.name}`;
+            }
+
             const placemark = new ymaps.Placemark([p.lat, p.lng], {
-                iconContent: `${idx + 1}. ${p.name}`,
+                iconContent: iconText,
                 hintContent: p.name
             }, {
-                preset: 'islands#blueStretchyIcon'
+                preset: iconPreset
             });
 
             placemark.events.add('click', function () {
@@ -230,15 +225,12 @@
         }
     }
 
-    // --- 5. ЛОГИКА GPS ---
+    // --- ЛОГИКА GPS ---
     function onFirstGps(position) {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        findNearestPoint(lat, lng);
+        findNearestPoint(position.coords.latitude, position.coords.longitude);
     }
 
     function onGpsUpdate(position) {
-        // ВКЛЮЧАЕМ ИНДИКАТОР
         gpsAvailable = true;
         gpsWarning.style.display = 'none';
         gpsStatusBar.className = 'gps-status on';
@@ -263,21 +255,46 @@
     }
 
     function onGpsError(error) {
-        // ВЫКЛЮЧАЕМ ИНДИКАТОР
         gpsAvailable = false;
         gpsStatusBar.className = 'gps-status off';
         gpsIcon.innerHTML = svgGpsOff;
         gpsLabel.textContent = "GPS выключен";
 
-        if (error.code === 1) { // Пользователь запретил доступ
+        if (error.code === 1) { 
             gpsWarning.style.display = 'block';
             statusText.textContent = 'Ожидание доступа к GPS...';
-        } else if (error.code === 3) { // Таймаут
+        } else if (error.code === 3) { 
             statusText.textContent = 'Поиск спутников GPS... Подождите.';
         }
     }
 
-    // --- 6. АУДИО И ПЕРЕКЛЮЧЕНИЕ ---
+    // --- АУДИО (С УЧЕТОМ ПРАВИЛЬНОЙ НУМЕРАЦИИ) ---
+    function playAudio(index) {
+        audioPlayer.pause();
+        audioPlayer.currentTime = 0;
+        
+        const point = POINTS[index];
+        let audioPath = "";
+
+        if (point.audioFile) {
+            // Для достопримечательности используется свой файл (landmark.mp3)
+            audioPath = point.audioFile;
+        } else {
+            // Для остановок считаем правильный номер, пропуская достопримечательности
+            let stopNumber = 0;
+            for (let i = 0; i <= index; i++) {
+                if (!POINTS[i].isLandmark) stopNumber++;
+            }
+            audioPath = `audio/${stopNumber}.mp3`;
+        }
+
+        audioPlayer.src = audioPath;
+        audioPlayer.play().catch(e => {
+            console.warn(`Аудиофайл ${audioPath} не найден.`, e);
+            statusText.textContent = `Файл ${audioPath} не найден.`;
+        });
+    }
+
     function findNearestPoint(lat = currentGpsLat, lng = currentGpsLng) {
         if (POINTS.length === 0 || !isAutoMode) return; 
         
@@ -295,7 +312,7 @@
             playAudio(currentIndex);
             statusText.textContent = `Приближаемся: ${POINTS[currentIndex].name}`;
         } else {
-            statusText.textContent = `Ближайшая: ${POINTS[nearestIdx].name} (${Math.round(minDist)} м)`;
+            statusText.textContent = `Ближайшая точка: ${POINTS[nearestIdx].name} (${Math.round(minDist)} м)`;
         }
     }
 
@@ -304,22 +321,25 @@
         findNearestPoint();
     }
 
-    function playAudio(index) {
-        audioPlayer.pause();
-        audioPlayer.currentTime = 0;
-        const trackNumber = index + 1;
-        audioPlayer.src = `audio/${trackNumber}.mp3`;
-        audioPlayer.play().catch(e => {
-            console.warn(`Аудиофайл audio/${trackNumber}.mp3 не найден.`, e);
-            statusText.textContent = `Файл audio/${trackNumber}.mp3 не найден.`;
-        });
-    }
-
+    // --- ОБНОВЛЕНИЕ ПАНЕЛИ (С УЧЕТОМ ДОСТОПРИМЕЧАТЕЛЬНОСТЕЙ) ---
     function updateUI(centerMap = false) {
         if (POINTS.length === 0) return;
         
         const point = POINTS[currentIndex];
-        currentPoiText.innerHTML = `<span class="poi-title">${currentIndex + 1}. ${point.name}</span>`;
+        
+        // Считаем номер остановки для нижней панели
+        let stopNumber = 0;
+        for (let i = 0; i <= currentIndex; i++) {
+            if (!POINTS[i].isLandmark) stopNumber++;
+        }
+
+        if (point.isLandmark) {
+            // Если это достопримечательность, выводим звездочку и оранжевый цвет
+            currentPoiText.innerHTML = `<span class="poi-title landmark-title">★ ${point.name}</span>`;
+        } else {
+            // Если остановка, выводим номер и синий цвет
+            currentPoiText.innerHTML = `<span class="poi-title">${stopNumber}. ${point.name}</span>`;
+        }
         
         btnPrev.disabled = (currentIndex === 0);
         btnNext.disabled = (currentIndex === POINTS.length - 1);
