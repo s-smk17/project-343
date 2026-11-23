@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -54,7 +55,7 @@
 
         .info { text-align: center; font-size: 13px; color: #333; margin-bottom: 5px; }
         .poi-title { font-weight: bold; color: #007bff; font-size: 16px; display: block; margin-top: 5px; }
-        .landmark-title { color: #e67e22 !important; } /* Оранжевый цвет для достопримечательности */
+        .landmark-title { color: #e67e22 !important; }
     </style>
 </head>
 <body>
@@ -92,38 +93,37 @@
 </div>
 
 <script>
-    // --- 1. МАРШРУТ С ДОСТОПРИМЕЧАТЕЛЬНОСТЬЮ ---
-    // Добавлено свойство isLandmark: true и audioFile для неё
+    // --- 1. МАРШРУТ (Добавлено свойство num для номеров на карте) ---
     const POINTS = [
-        { name: "Станция метро Проспект Ветеранов", lat: 59.841925, lng: 30.251472 },
-        { name: "Улица Солдата Корзуна", lat: 59.833626, lng: 30.217203 },
-        { name: "Проспект Маршала Жукова", lat: 59.833122, lng: 30.196659 },
-        { name: "Авангардная улица", lat: 59.833096, lng: 30.181858 },
-        { name: "Улица Пограничника Гарькавого", lat: 59.835494, lng: 30.146030 },
-        { name: "Улица Пионерстроя", lat: 59.835505, lng: 30.128085 },
-        { name: "Рогачёвский переулок", lat: 59.841970, lng: 30.130531 },
-        { name: "Проспект Будённого", lat: 59.852752, lng: 30.089369 },
-        // ВСТАВЛЕНА ДОСТОПРИМЕЧАТЕЛЬНОСТЬ
-        { name: "Константиновский дворец", lat: 59.851541, lng: 30.058099, isLandmark: true, audioFile: "audio/landmark.mp3" },
-        { name: "Фронтовая улица", lat: 59.852910, lng: 30.036047 },
-        { name: "Кропоткинская улица", lat: 59.854896, lng: 30.020567 },
-        { name: "Улица Крылова", lat: 59.858147, lng: 30.004907 },
-        { name: "Константиновская улица – Николаевская больница", lat: 59.878519, lng: 29.920103 },
-        { name: "Разводная улица", lat: 59.880977, lng: 29.902956 },
-        { name: "Фабричная улица", lat: 59.883181, lng: 29.889367 },
-        { name: "Посёлок Просвещения", lat: 59.894253, lng: 29.861075 },
-        { name: "Мордвиновка", lat: 59.899376, lng: 29.827707 },
-        { name: "Новогорская улица", lat: 59.899998, lng: 29.814455 },
-        { name: "Улица Связи", lat: 59.897904, lng: 29.807719 },
-        { name: "Улица Федюнинского", lat: 59.894654, lng: 29.796321 },
-        { name: "Ораниенбаумский проспект / Улица Федюнинского, 31", lat: 59.900046, lng: 29.777662 },
-        { name: "Улица Федюнинского / Улица Победы", lat: 59.903017, lng: 29.770512 },
-        { name: "Швейцарская улица / Улица Победы", lat: 59.906088, lng: 29.772622 },
-        { name: "Красноармейская улица", lat: 59.907723, lng: 29.774272 },
-        { name: "Александровская улица", lat: 59.909975, lng: 29.774892 },
-        { name: "Ломоносов – Владимирская улица", lat: 59.910435, lng: 29.769417 },
-        { name: "Ломоносовская межрайонная больница", lat: 59.913697, lng: 29.767054 },
-        { name: "Ломоносов – Вокзал", lat: 59.917927, lng: 29.767671 }
+        { num: "1", name: "Станция метро Проспект Ветеранов", lat: 59.841925, lng: 30.251472 },
+        { num: "2", name: "Улица Солдата Корзуна", lat: 59.833626, lng: 30.217203 },
+        { num: "3", name: "Проспект Маршала Жукова", lat: 59.833122, lng: 30.196659 },
+        { num: "4", name: "Авангардная улица", lat: 59.833096, lng: 30.181858 },
+        { num: "5", name: "Улица Пограничника Гарькавого", lat: 59.835494, lng: 30.146030 },
+        { num: "6", name: "Улица Пионерстроя", lat: 59.835505, lng: 30.128085 },
+        { num: "7", name: "Рогачёвский переулок", lat: 59.841970, lng: 30.130531 },
+        { num: "8", name: "Проспект Будённого", lat: 59.852752, lng: 30.089369 },
+        // ДОСТОПРИМЕЧАТЕЛЬНОСТЬ 8.5
+        { num: "8.5", name: "Константиновский дворец", lat: 59.851541, lng: 30.058099, isLandmark: true },
+        { num: "9", name: "Фронтовая улица", lat: 59.852910, lng: 30.036047 },
+        { num: "10", name: "Кропоткинская улица", lat: 59.854896, lng: 30.020567 },
+        { num: "11", name: "Улица Крылова", lat: 59.858147, lng: 30.004907 },
+        { num: "12", name: "Константиновская улица – Николаевская больница", lat: 59.878519, lng: 29.920103 },
+        { num: "13", name: "Разводная улица", lat: 59.880977, lng: 29.902956 },
+        { num: "14", name: "Фабричная улица", lat: 59.883181, lng: 29.889367 },
+        { num: "15", name: "Посёлок Просвещения", lat: 59.894253, lng: 29.861075 },
+        { num: "16", name: "Мордвиновка", lat: 59.899376, lng: 29.827707 },
+        { num: "17", name: "Новогорская улица", lat: 59.899998, lng: 29.814455 },
+        { num: "18", name: "Улица Связи", lat: 59.897904, lng: 29.807719 },
+        { num: "19", name: "Улица Федюнинского", lat: 59.894654, lng: 29.796321 },
+        { num: "20", name: "Ораниенбаумский проспект / Улица Федюнинского, 31", lat: 59.900046, lng: 29.777662 },
+        { num: "21", name: "Улица Федюнинского / Улица Победы", lat: 59.903017, lng: 29.770512 },
+        { num: "22", name: "Швейцарская улица / Улица Победы", lat: 59.906088, lng: 29.772622 },
+        { num: "23", name: "Красноармейская улица", lat: 59.907723, lng: 29.774272 },
+        { num: "24", name: "Александровская улица", lat: 59.909975, lng: 29.774892 },
+        { num: "25", name: "Ломоносов – Владимирская улица", lat: 59.910435, lng: 29.769417 },
+        { num: "26", name: "Ломоносовская межрайонная больница", lat: 59.913697, lng: 29.767054 },
+        { num: "27", name: "Ломоносов – Вокзал", lat: 59.917927, lng: 29.767671 }
     ];
 
     const DEFAULT_LAT = 59.841925; 
@@ -179,35 +179,28 @@
         setInterval(checkLocationAndPlay, CHECK_INTERVAL);
     }
 
-    // --- ОТРИСОВКА КАРТЫ (С УЧЕТОМ ДОСТОПРИМЕЧАТЕЛЬНОСТЕЙ) ---
+    // --- 2. ОТРИСОВКА КАРТЫ (ТОЛЬКО ЦИФРЫ И РАЗНЫЕ ЦВЕТА) ---
     function drawMapRoute() {
         if (!map) return;
         map.geoObjects.removeAll();
         routeMarkers = [];
 
-        let stopCounter = 0; // Отдельный счетчик для остановок
-
         POINTS.forEach((p, idx) => {
-            let iconText = "";
-            let iconPreset = "islands#blueStretchyIcon";
-
+            let iconPreset = "islands#blueIcon"; // Синий маркер для остановок
+            
             if (p.isLandmark) {
-                // Достопримечательность: звездочка, без номера, оранжевый цвет
-                iconText = `★ ${p.name}`;
-                iconPreset = "islands#orangeStretchyIcon";
-            } else {
-                // Обычная остановка: увеличиваем счетчик и ставим номер
-                stopCounter++;
-                iconText = `${stopCounter}. ${p.name}`;
+                iconPreset = "islands#orangeIcon"; // Оранжевый для достопримечательности
             }
 
             const placemark = new ymaps.Placemark([p.lat, p.lng], {
-                iconContent: iconText,
+                iconContent: p.num, // Только номер!
+                balloonContent: `<b>${p.num}. ${p.name}</b>`, // Всплывающее окно при клике
                 hintContent: p.name
             }, {
                 preset: iconPreset
             });
 
+            // Обработчик клика по маркеру
             placemark.events.add('click', function () {
                 isAutoMode = false;      
                 currentIndex = idx;      
@@ -225,7 +218,7 @@
         }
     }
 
-    // --- ЛОГИКА GPS ---
+    // --- 3. ЛОГИКА GPS ---
     function onFirstGps(position) {
         findNearestPoint(position.coords.latitude, position.coords.longitude);
     }
@@ -268,25 +261,13 @@
         }
     }
 
-    // --- АУДИО (С УЧЕТОМ ПРАВИЛЬНОЙ НУМЕРАЦИИ) ---
+    // --- 4. АУДИО (ИСПОЛЬЗУЕТ НОМЕРА) ---
     function playAudio(index) {
         audioPlayer.pause();
         audioPlayer.currentTime = 0;
         
         const point = POINTS[index];
-        let audioPath = "";
-
-        if (point.audioFile) {
-            // Для достопримечательности используется свой файл (landmark.mp3)
-            audioPath = point.audioFile;
-        } else {
-            // Для остановок считаем правильный номер, пропуская достопримечательности
-            let stopNumber = 0;
-            for (let i = 0; i <= index; i++) {
-                if (!POINTS[i].isLandmark) stopNumber++;
-            }
-            audioPath = `audio/${stopNumber}.mp3`;
-        }
+        const audioPath = `audio/${point.num}.mp3`; // Например, audio/8.5.mp3
 
         audioPlayer.src = audioPath;
         audioPlayer.play().catch(e => {
@@ -321,24 +302,16 @@
         findNearestPoint();
     }
 
-    // --- ОБНОВЛЕНИЕ ПАНЕЛИ (С УЧЕТОМ ДОСТОПРИМЕЧАТЕЛЬНОСТЕЙ) ---
+    // --- 5. ОБНОВЛЕНИЕ НИЖНЕЙ ПАНЕЛИ ---
     function updateUI(centerMap = false) {
         if (POINTS.length === 0) return;
         
         const point = POINTS[currentIndex];
-        
-        // Считаем номер остановки для нижней панели
-        let stopNumber = 0;
-        for (let i = 0; i <= currentIndex; i++) {
-            if (!POINTS[i].isLandmark) stopNumber++;
-        }
 
         if (point.isLandmark) {
-            // Если это достопримечательность, выводим звездочку и оранжевый цвет
-            currentPoiText.innerHTML = `<span class="poi-title landmark-title">★ ${point.name}</span>`;
+            currentPoiText.innerHTML = `<span class="poi-title landmark-title">★ ${point.num} — ${point.name}</span>`;
         } else {
-            // Если остановка, выводим номер и синий цвет
-            currentPoiText.innerHTML = `<span class="poi-title">${stopNumber}. ${point.name}</span>`;
+            currentPoiText.innerHTML = `<span class="poi-title">${point.num}. ${point.name}</span>`;
         }
         
         btnPrev.disabled = (currentIndex === 0);
