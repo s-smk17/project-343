@@ -3,107 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Аудиогид 343Э (Умный поиск точек)</title>
+    <title>Аудиогид 343Э</title>
+    <style>
+        #status { padding: 10px; font-weight: bold; }
+        .error { color: red; }
+        .success { color: green; }
+        .warning { color: orange; }
+    </style>
 </head>
 <body>
     <h1>Аудиогид 343Э</h1>
-    <p id="status">Ожидание геолокации...</p>
-    <button id="startBtn">Запустить гид (требуется для разрешения звука)</button>
+    <div id="status">Ожидание запуска...</div>
+    <button id="startBtn" style="padding: 10px 20px; font-size: 16px;">Запустить гид</button>
 
     <script>
-        // 1. Список ваших остановок. Обратите внимание: id теперь с точкой!
-        // Вам нужно будет проставить реальные координаты.
+        // --- ВАШИ ДАННЫЕ ---
         const points = [
             { id: 1.0,  name: "Ломоносов – Вокзал", lat: 59.9145, lon: 29.7720 },
             { id: 2.0,  name: "Ломоносовская межрайонная больница", lat: 59.9080, lon: 29.7800 },
             { id: 12.0, name: "Улица Связи (пример)", lat: 59.8900, lon: 29.8000 },
             { id: 12.1, name: "Новогорская улица (пример)", lat: 59.8850, lon: 29.8100 },
-            { id: 12.5, name: "Улица Жоры Антоненко (пример)", lat: 59.8800, lon: 29.8200 }, // <- Для этого сработает файл 0125
+            { id: 12.5, name: "Улица Жоры Антоненко (пример)", lat: 59.8800, lon: 29.8200 },
             { id: 12.8, name: "Мордвиновка (пример)", lat: 59.8750, lon: 29.8300 },
             { id: 30.0, name: "Станция метро Проспект Ветеранов", lat: 59.8480, lon: 30.1600 }
         ];
 
-        // 2. Ваши аудиофайлы
-        const audioFiles = [
-            "01.mp3", 
-            "02.mp3", 
-            "012.mp3",  // сработает для 12.0
-            "0125.mp3", // сработает для 12.5 (так как 12.5 есть в списке)
-            "0129.mp3", // 12.9 нет в списке, сработает для ближайшей (12.8)
-            "030.mp3"
-        ];
+        const audioFiles = ["01.mp3", "02.mp3", "012.mp3", "0125.mp3", "0129.mp3", "030.mp3"];
 
-        // Функция преобразования имени файла в ID: "0125" -> 12.5
+        // --- ЛОГИКА ПОИСКА ФАЙЛОВ ---
         function parseFileNameToId(fileName) {
-            let numStr = fileName.split('.')[0]; // Берем "0125"
-            
-            // Убираем ведущий ноль
-            if (numStr.startsWith('0')) {
-                numStr = numStr.substring(1);
-            }
-            
-            // Если осталась одна цифра, добавляем .0 (например "01" -> "1" -> 1.0)
-            if (numStr.length === 1) {
-                return parseFloat(numStr + ".0");
-            }
-
-            // Вставляем точку перед последней цифрой: "125" -> "12.5"
-            if (numStr.length > 1) {
-                numStr = numStr.slice(0, -1) + '.' + numStr.slice(-1);
-            }
-            
+            let numStr = fileName.split('.')[0];
+            if (numStr.startsWith('0')) numStr = numStr.substring(1);
+            if (numStr.length === 1) return parseFloat(numStr + ".0");
+            if (numStr.length > 1) numStr = numStr.slice(0, -1) + '.' + numStr.slice(-1);
             return parseFloat(numStr);
         }
 
-        // Функция умного поиска точки
         function findBestPointMatch(targetId, allPoints) {
-            // 1. Ищем точное совпадение
             let exactMatch = allPoints.find(p => p.id === targetId);
             if (exactMatch) return { point: exactMatch, matchType: 'точное' };
 
-            // 2. Ищем точки с такой же целой частью (например, для 12.9 ищем среди 12.x)
             let integerPart = Math.floor(targetId);
             let sameIntegerPoints = allPoints.filter(p => Math.floor(p.id) === integerPart);
-            
             if (sameIntegerPoints.length > 0) {
-                // Сортируем по разнице и берем самую близкую
                 sameIntegerPoints.sort((a, b) => Math.abs(a.id - targetId) - Math.abs(b.id - targetId));
                 return { point: sameIntegerPoints[0], matchType: 'похожая (та же целая часть)' };
             }
 
-            // 3. Если вообще ничего нет, ищем математически ближайшую точку на маршруте
             if (allPoints.length > 0) {
                 let sortedAll = [...allPoints].sort((a, b) => Math.abs(a.id - targetId) - Math.abs(b.id - targetId));
                 return { point: sortedAll[0], matchType: 'ближайшая по номеру' };
             }
-
             return null;
         }
 
-        // Создаем карту аудиофайлов с учетом умного поиска
         const audioMap = {};
         audioFiles.forEach(file => {
             const parsedId = parseFileNameToId(file);
             const matchResult = findBestPointMatch(parsedId, points);
-            
-            if (matchResult && matchResult.point) {
-                // Если для этой точки уже есть файл, не перезаписываем его (приоритет точного совпадения)
-                if (!audioMap[matchResult.point.id]) {
-                    audioMap[matchResult.point.id] = {
-                        file: file,
-                        originalId: parsedId,
-                        matchType: matchResult.matchType
-                    };
-                    console.log(`Файл ${file} (ID ${parsedId}) привязан к точке ${matchResult.point.id} (${matchResult.matchType})`);
-                }
+            if (matchResult && matchResult.point && !audioMap[matchResult.point.id]) {
+                audioMap[matchResult.point.id] = { file: file, originalId: parsedId, matchType: matchResult.matchType };
             }
         });
 
-        // Дальше - стандартная логика геолокации
+        // --- ГЕОЛОКАЦИЯ И ИСПРАВЛЕНИЕ ОШИБОК ---
         const RADIUS_METERS = 50; 
         let lastPlayedPointId = null;
         let currentAudio = new Audio();
         let isStarted = false;
+        let watchId = null;
+        let retryCount = 0;
 
         function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3; 
@@ -111,56 +80,123 @@
             const φ2 = lat2 * Math.PI / 180;
             const Δφ = (lat2 - lat1) * Math.PI / 180;
             const Δλ = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                      Math.cos(φ1) * Math.cos(φ2) *
-                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return R * c;
         }
 
+        // Функция обновления статуса
+        function updateStatus(text, className) {
+            const el = document.getElementById('status');
+            el.innerText = text;
+            el.className = className || '';
+        }
+
+        // ОБРАБОТКА ОШИБОК GPS
+        function handleLocationError(error) {
+            console.error("GPS Error:", error);
+            let errorMsg = "";
+            
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg = "❌ Доступ к GPS запрещен. Разрешите геолокацию в настройках браузера для этого сайта.";
+                    updateStatus(errorMsg, "error");
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg = "📡 Сигнал GPS не найден. Включите GPS на телефоне или выйдите на улицу.";
+                    updateStatus(errorMsg, "warning");
+                    retryGPS();
+                    break;
+                case error.TIMEOUT:
+                    errorMsg = "⏱️ GPS не успел ответить. Пробуем еще раз...";
+                    updateStatus(errorMsg, "warning");
+                    retryGPS();
+                    break;
+                default:
+                    errorMsg = "⚠️ Неизвестная ошибка GPS: " + error.message;
+                    updateStatus(errorMsg, "error");
+                    retryGPS();
+                    break;
+            }
+        }
+
+        // Автоматический перезапуск при таймауте или плохом сигнале
+        function retryGPS() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+            }
+            retryCount++;
+            if (retryCount < 5) { // Пробуем 5 раз
+                setTimeout(() => {
+                    updateStatus(`Повторная попытка подключения к GPS (${retryCount}/5)...`, "warning");
+                    startTracking();
+                }, 3000);
+            } else {
+                updateStatus("Не удалось получить GPS. Проверьте настройки геолокации.", "error");
+            }
+        }
+
         function startTracking() {
-            if (!navigator.geolocation) return;
+            if (!navigator.geolocation) {
+                updateStatus("❌ Ваш браузер не поддерживает геолокацию.", "error");
+                return;
+            }
 
-            navigator.geolocation.watchPosition((position) => {
-                const userLat = position.coords.latitude;
-                const userLon = position.coords.longitude;
+            // ВАЖНО: Увеличен timeout до 20 секунд (20000 мс) для холодного старта GPS
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    // Если получили координаты — сбрасываем счетчик ошибок
+                    retryCount = 0; 
+                    updateStatus("✅ GPS работает. Следим за маршрутом...", "success");
 
-                points.forEach(point => {
-                    const distance = getDistance(userLat, userLon, point.lat, point.lon);
+                    const userLat = position.coords.latitude;
+                    const userLon = position.coords.longitude;
 
-                    if (distance <= RADIUS_METERS && lastPlayedPointId !== point.id) {
-                        const audioData = audioMap[point.id];
+                    points.forEach(point => {
+                        const distance = getDistance(userLat, userLon, point.lat, point.lon);
 
-                        if (audioData) {
-                            document.getElementById('status').innerText = `Точка ${point.id} (${audioData.matchType}). Играет: ${audioData.file}`;
-                            
-                            currentAudio.pause();
-                            currentAudio.src = audioData.file;
-                            currentAudio.play().catch(e => console.error("Ошибка звука:", e));
+                        if (distance <= RADIUS_METERS && lastPlayedPointId !== point.id) {
+                            const audioData = audioMap[point.id];
 
-                            lastPlayedPointId = point.id; 
-                            
-                            setTimeout(() => {
-                                if (lastPlayedPointId === point.id) lastPlayedPointId = null;
-                            }, 120000); // Сброс через 2 минуты
+                            if (audioData) {
+                                updateStatus(`🔊 Точка ${point.id}: ${point.name}. Играет: ${audioData.file}`, "success");
+                                
+                                currentAudio.pause();
+                                currentAudio.src = audioData.file;
+                                currentAudio.play().catch(e => {
+                                    console.error("Ошибка звука:", e);
+                                    updateStatus("⚠️ Нажмите на экран, чтобы разрешить воспроизведение звука!", "warning");
+                                });
+
+                                lastPlayedPointId = point.id; 
+                                setTimeout(() => { if (lastPlayedPointId === point.id) lastPlayedPointId = null; }, 120000);
+                            }
                         }
-                    }
-                });
-            }, (error) => {
-                document.getElementById('status').innerText = "Ошибка GPS: " + error.message;
-            }, {
-                enableHighAccuracy: true,
-                maximumAge: 0,
-                timeout: 5000
-            });
+                    });
+                }, 
+                handleLocationError, // Вызываем нашу новую функцию обработки ошибок
+                {
+                    enableHighAccuracy: true, // Требуем максимальную точность (использовать GPS, а не Wi-Fi)
+                    maximumAge: 10000,        // Разрешаем кэшировать координаты на 10 секунд (меньше нагрузка)
+                    timeout: 20000            // ЖДЕМ 20 СЕКУНД ВМЕСТО 5
+                }
+            );
         }
 
         document.getElementById('startBtn').addEventListener('click', () => {
             if (!isStarted) {
+                // Проверка на безопасное соединение (HTTPS)
+                if (window.location.protocol !== "https:" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+                    updateStatus("⚠️ GPS не работает по протоколу HTTP! Открывайте сайт только по ссылке HTTPS.", "error");
+                    return;
+                }
+
+                // Разблокировка аудио
                 currentAudio.play().catch(() => {});
                 isStarted = true;
-                startTracking();
                 document.getElementById('startBtn').style.display = 'none';
+                updateStatus("Запрос доступа к GPS...", "warning");
+                startTracking();
             }
         });
     </script>
