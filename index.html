@@ -82,18 +82,20 @@
             padding-bottom: calc(15px + env(safe-area-inset-bottom, 10px)); 
         }
         
-        /* Обновленный блок кнопок */
+        /* Группа кнопок */
         .btn-group { 
             display: flex; 
             gap: 10px; 
             margin-bottom: 12px; 
-            align-items: stretch; /* Кнопки выравниваются по высоте */
+            align-items: stretch; 
+            width: 100%;
+            box-sizing: border-box;
         }
         
         button.action-btn { 
             flex: 1; 
-            padding: 14px; 
-            font-size: 16px; 
+            padding: 14px 5px; 
+            font-size: 15px; 
             border: none; 
             border-radius: 8px; 
             background: #007bff; 
@@ -102,22 +104,26 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            box-sizing: border-box;
         }
         button.action-btn:active { background: #0056b3; }
         button.action-btn:disabled { background: #ccc; }
 
-        /* НОВАЯ КНОПКА ПРИЦЕЛА */
+        /* Кнопка "Найти меня" со стрелкой */
         #btn-locate { 
-            flex: 0 0 56px; /* Фиксированная ширина 56px, чтобы не сжималась */
+            flex: 0 0 54px; /* Жесткая ширина */
+            min-width: 54px;
             background: #fff; 
             border: 2px solid #007bff;
             padding: 0;
+            box-sizing: border-box;
         }
         #btn-locate:active { background: #e6f0ff; }
         #btn-locate svg {
-            width: 28px;
-            height: 28px;
+            width: 26px;
+            height: 26px;
             fill: #007bff;
+            display: block;
         }
 
         .info { text-align: center; font-size: 14px; color: #333; margin-bottom: 5px; }
@@ -150,12 +156,11 @@
         <div class="btn-group">
             <button id="btn-prev" class="action-btn" disabled>◀ Назад</button>
             
-            <!-- КНОПКА ПРИЦЕЛА С SVG ИКОНКОЙ -->
-            <button id="btn-locate" class="action-btn" title="Показать меня на карте">
+            <!-- НОВАЯ КНОПКА СО СТРЕЛКОЙ ВВЕРХ -->
+            <button id="btn-locate" class="action-btn" title="Найти меня">
                 <svg viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="8" stroke="#007bff" stroke-width="2" fill="none"/>
-                    <circle cx="12" cy="12" r="3" fill="#007bff"/>
-                    <path d="M12 2v3m0 14v3M2 12h3m14 0h3" stroke="#007bff" stroke-width="2" stroke-linecap="round"/>
+                    <!-- Векторная стрелка вверх -->
+                    <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
                 </svg>
             </button>
             
@@ -263,7 +268,6 @@
     // Обработчик кнопки "Найти меня"
     btnLocate.addEventListener('click', () => {
         if (gpsAvailable && map) {
-            // Плавно перемещаем карту к текущим координатам пользователя
             map.panTo([currentGpsLat, currentGpsLng], {
                 zoom: 16,
                 duration: 500
