@@ -18,23 +18,17 @@ STOPS_343E = [
         # Направление движения в градусах (азимут).
         # 0 = север, 90 = восток, 180 = юг, 270 = запад.
         # Если None — направление не проверяется.
-        "heading": 90,
     },
     {
         "name": "Федюнинская улица",
         "lat": 59.902710, "lon": 29.770293,
         "audio": "faduninskaya.wav",
-        "heading": 120,
     },
     # ... остальные
 ]
 
 # Радиус срабатывания. НЕ МЕНЬШЕ 15 метров — иначе GPS проскочит.
 TRIGGER_RADIUS_M = 20
-
-# Насколько должна совпадать "сторона" движения с заданным азимутом.
-# 60° — значит движение в пределах ±60° от заданного направления считается "правильным".
-HEADING_TOLERANCE_DEG = 90
 
 # Минимальная скорость, чтобы считать, что мы реально едем, а не стоим.
 MIN_SPEED_MPS = 0.0
@@ -80,13 +74,128 @@ def main(page: ft.Page):
     content_host = ft.Container(expand=True, padding=16)
     audio_players = {}
     audio_buttons = {}
+    audio_progress_bars = {}
+    audio_time_labels = {}
+    audio_is_seeking = {
+    stop["name"]: False for stop in STOPS_343E
+    }
 
+    audio_positions_ms = {
+        stop["name"]: 0 for stop in STOPS_343E
+    }
+    audio_durations_ms = {
+        stop["name"]: 0 for stop in STOPS_343E
+    }
+
+    def format_audio_time(milliseconds):
+        seconds = max(0, int(milliseconds / 1000))
+        minutes = seconds // 60
+        seconds = seconds % 60
+        return f"{minutes:02d}:{seconds:02d}"
+
+    def refresh_audio_progress(name):
+        progress_bar = audio_progress_bars.get(name)
+        time_label = audio_time_labels.get(name)
+
+        if progress_bar is None or time_label is None:
+            return
+
+        position = audio_positions_ms[name]
+        duration = audio_durations_ms[name]
+        progress_bar.max = max(duration, 1)
+
+        if not audio_is_seeking[name]:
+            progress_bar.value = (
+                min(position, duration) if duration > 0 else 0
+            )
+
+        total_text = (
+            format_audio_time(duration)
+            if duration > 0 else "--:--"
+        )
+
+        time_label.value = (
+            f"{format_audio_time(position)} / {total_text}"
+        )
+
+        page.update()
+
+    def handle_audio_position(name, e):
+        audio_positions_ms[name] = int(e.position)
+        refresh_audio_progress(name)
+
+    def handle_audio_duration(name, e):
+            audio_durations_ms[name] = int(
+                e.duration.in_milliseconds
+            )
+
+            refresh_audio_progress(name)
+
+            if name in audio_progress_bars:
+                audio_progress_bars[name].disabled = (
+                    name != current_stop_name
+                    or audio_durations_ms[name] <= 0
+                )
+
+    def start_audio_seek(name, e):
+        audio_is_seeking[name] = True
+
+    def preview_audio_seek(name, e):
+        target = int(e.control.value)
+        duration = audio_durations_ms[name]
+
+        audio_time_labels[name].value = (
+            f"{format_audio_time(target)} / "
+            f"{format_audio_time(duration)}"
+        )
+        page.update()
+
+    async def seek_audio(name, target_ms):
+        if current_stop_name != name:
+            audio_is_seeking[name] = False
+            refresh_audio_progress(name)
+            return
+
+        duration = audio_durations_ms[name]
+        target_ms = max(0, min(int(target_ms), duration))
+
+        try:
+            audio = audio_players[name]
+
+            await audio.seek(
+                ft.Duration(milliseconds=target_ms)
+            )
+
+            audio_positions_ms[name] = target_ms
+
+        except Exception as exc:
+            print("ОШИБКА ПЕРЕМОТКИ:", repr(exc))
+            show_error(f"Не удалось перемотать запись: {exc}")
+
+        finally:
+            audio_is_seeking[name] = False
+            refresh_audio_progress(name)
+
+    def handle_audio_duration(name, e):
+        audio_durations_ms[name] = int(
+            e.duration.in_milliseconds
+        )
+        
+        refresh_audio_progress(name)
+
+        if name in audio_progress_bars:
+            audio_progress_bars[name].disabled = (
+                name != current_stop_name
+                or audio_durations_ms[name] <= 0
+            )
     # Создаём аудиоплееры при запуске приложения
     for stop in STOPS_343E:
         audio = fta.Audio(
             src=stop["audio"],
             autoplay=False,
             release_mode=fta.ReleaseMode.STOP,
+            on_position_change=lambda e, name=stop["name"]: handle_audio_position(name, e),
+            on_duration_change=lambda e, name=stop["name"]: handle_audio_duration(name, e),
         )
         page.services.append(audio)
         audio_players[stop["name"]] = audio
@@ -136,13 +245,27 @@ def main(page: ft.Page):
 
     current_marker = ftm.Marker(
         coordinates=ftm.MapLatitudeLongitude(latitude=59.908, longitude=29.778),
-        content=ft.Icon(ft.Icons.DIRECTIONS_BUS, color=ft.Colors.BLUE, size=32),
-        width=40,
+        content=ft.Icon(ft.Icons.NAVIGATION, color=ft.Colors.BLUE, size=32),
         height=40,
     )
+    follow_bus = False
 
+    def on_map_position_change(e):
+        nonlocal follow_bus
+
+        # Если пользователь сам передвинул карту — отключаем слежение.
+        if e.has_gesture and follow_bus:
+            follow_bus = False
+
+            if follow_button is not None:
+                follow_button.icon_color = ft.Colors.GREY
+                page.update()
     map_control = ftm.Map(
+        on_position_change=on_map_position_change,
         expand=True,
+        interaction_configuration=ftm.InteractionConfiguration(
+            flags=ftm.InteractionFlag.ALL
+        ),
         initial_center=ftm.MapLatitudeLongitude(latitude=59.908, longitude=29.778),
         initial_zoom=12,
         layers=[
@@ -154,6 +277,33 @@ def main(page: ft.Page):
             ftm.SimpleAttribution(text="© OpenStreetMap contributors"),
         ],
     )
+   
+    follow_button = ft.IconButton(
+        icon=ft.Icons.MY_LOCATION,
+        icon_size=26,
+        icon_color=ft.Colors.GREY,
+        tooltip="Включить слежение",
+        bgcolor=ft.Colors.WHITE,
+        on_click=lambda e: page.run_task(toggle_follow_bus),
+    )
+    async def toggle_follow_bus():
+        nonlocal follow_bus
+        follow_bus = not follow_bus
+        if follow_bus:
+            follow_button.icon_color = ft.Colors.BLUE
+            follow_button.tooltip = "Отключить слежение"
+
+            if smooth_lat is not None:
+                await map_control.move_to(
+                    destination=ftm.MapLatitudeLongitude(
+                        latitude=smooth_lat,
+                        longitude=smooth_lon,
+                    )
+                )
+        else:
+            follow_button.icon_color = ft.Colors.GREY
+            follow_button.tooltip = "Включить слежение"
+        page.update()
 
     def update_audio_buttons():
         for name, button in audio_buttons.items():
@@ -166,42 +316,110 @@ def main(page: ft.Page):
         page.update()
 
     def stop_card(stop):
+        name = stop["name"]
+
         play_button = ft.IconButton(
             icon=ft.Icons.PLAY_CIRCLE_FILL,
             icon_size=36,
             tooltip="Воспроизвести",
             on_click=lambda e, s=stop: page.run_task(play_audio, s),
         )
-        audio_buttons[stop["name"]] = play_button
+
+        audio_buttons[name] = play_button
+
+        position = audio_positions_ms[name]
+        duration = audio_durations_ms[name]
+
+        total_text = (
+            format_audio_time(duration)
+            if duration > 0 else "--:--"
+        )
+
+        # Ползунок перемотки
+        progress_bar = ft.Slider(
+            min=0,
+            max=max(duration, 1),
+            value=min(position, duration) if duration > 0 else 0,
+            expand=True,
+            disabled=(
+                name != current_stop_name or duration <= 0
+            ),
+
+            # Начало перемотки
+            on_change_start=lambda e, n=name:
+                start_audio_seek(n, e),
+
+            # Предварительный просмотр времени
+            on_change=lambda e, n=name:
+                preview_audio_seek(n, e),
+
+            # Перемотка после отпускания ползунка
+            on_change_end=lambda e, n=name:
+                page.run_task(seek_audio, n, e.control.value),
+        )
+
+        time_label = ft.Text(
+            f"{format_audio_time(position)} / {total_text}",
+            size=11,
+            color=ft.Colors.GREY,
+        )
+
+        audio_progress_bars[name] = progress_bar
+        audio_time_labels[name] = time_label
 
         return ft.Card(
             content=ft.Container(
                 padding=12,
-                content=ft.Row(
+                content=ft.Column(
+                    spacing=8,
                     controls=[
-                        ft.Container(
-                            width=48,
-                            height=48,
-                            border_radius=12,
-                            bgcolor=ft.Colors.BLUE_100,
-                            alignment=ft.Alignment.CENTER,
-                            content=ft.Icon(ft.Icons.MUSIC_NOTE, color=ft.Colors.BLUE_800, size=26),
-                        ),
-                        ft.Column(
-                            expand=True,
-                            spacing=4,
+                        ft.Row(
                             controls=[
-                                ft.Text(stop["name"], weight=ft.FontWeight.BOLD, size=15),
-                                ft.Text("Аудиорассказ об остановке", size=12, color=ft.Colors.GREY),
+                                ft.Container(
+                                    width=48,
+                                    height=48,
+                                    border_radius=12,
+                                    bgcolor=ft.Colors.BLUE_100,
+                                    alignment=ft.Alignment.CENTER,
+                                    content=ft.Icon(
+                                        ft.Icons.MUSIC_NOTE,
+                                        color=ft.Colors.BLUE_800,
+                                        size=26,
+                                    ),
+                                ),
+                                ft.Column(
+                                    expand=True,
+                                    spacing=4,
+                                    controls=[
+                                        ft.Text(
+                                            name,
+                                            weight=ft.FontWeight.BOLD,
+                                            size=15,
+                                        ),
+                                        ft.Text(
+                                            "Аудиорассказ об остановке",
+                                            size=12,
+                                            color=ft.Colors.GREY,
+                                        ),
+                                    ],
+                                ),
+                                play_button,
                             ],
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         ),
-                        play_button,
+                        ft.Row(
+                            controls=[
+                                progress_bar,
+                                time_label,
+                            ],
+                            spacing=10,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        ),
                     ],
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
             )
         )
-
+    
     async def stop_all_audio():
         nonlocal current_audio, current_stop_name, audio_paused
 
@@ -268,6 +486,9 @@ def main(page: ft.Page):
 
                 update_audio_buttons()
 
+                audio_positions_ms[stop["name"]] = 0
+                refresh_audio_progress(stop["name"])
+
                 print("ЗАПУСКАЕМ:", stop["name"])
                 await audio.play()
 
@@ -292,7 +513,7 @@ def main(page: ft.Page):
 
     async def check_location(lat, lon, speed):
         nonlocal prev_pos, smooth_lat, smooth_lon
-        speed_text = "—" if speed is None else f"{speed:.1f} м/с"
+        speed_text = "—" if speed is None else f"{speed * 3.6:.1f} км/ч"
         if smooth_lat is None:
             smooth_lat = lat
             smooth_lon = lon
@@ -305,19 +526,14 @@ def main(page: ft.Page):
             latitude=smooth_lat,
             longitude=smooth_lon,
         )
-        try:
-            await map_control.move_to(
-                destination=current_marker.coordinates,
-            )
-        except Exception as exc:
-            print(f"Не удалось переместить карту: {exc}")
+        if follow_bus:
+            try:
+                await map_control.move_to(
+                    destination=current_marker.coordinates,
+                )
+            except Exception as exc:
+                print(f"Не удалось переместить карту: {exc}")
         page.update()
-
-        current_heading = None
-        if prev_pos is not None:
-            prev_lat, prev_lon, _ = prev_pos
-            if haversine(prev_lat, prev_lon, lat, lon) > 3:
-                current_heading = bearing(prev_lat, prev_lon, lat, lon)
 
         for stop in STOPS_343E:
             distance = haversine(lat, lon, stop["lat"], stop["lon"])
@@ -326,9 +542,6 @@ def main(page: ft.Page):
                 continue
             if triggered[stop["name"]]:
                 continue
-            if stop.get("heading") is not None and current_heading is not None:
-                if angle_diff(current_heading, stop["heading"]) > HEADING_TOLERANCE_DEG:
-                    continue
 
             triggered[stop["name"]] = True
             page.run_task(play_audio, stop)
@@ -381,7 +594,23 @@ def main(page: ft.Page):
             controls=[
                 ft.Text("Маршрут 343Э", size=24, weight=ft.FontWeight.BOLD),
                 ft.Text("Остановки и текущее местоположение", size=13, color=ft.Colors.GREY),
-                ft.Container(content=map_control, height=330, border_radius=16, clip_behavior=ft.ClipBehavior.ANTI_ALIAS),
+                ft.Container(
+                content=ft.Stack(
+                    expand=True,
+                    controls=[
+                        map_control,
+                        ft.Container(
+                            expand=True,
+                            alignment=ft.Alignment.BOTTOM_RIGHT,
+                            padding=12,
+                            content=follow_button,
+                        ),
+                    ],
+                ),
+                height=330,
+                border_radius=16,
+                clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                ),
                 ft.Container(
                     padding=12,
                     border_radius=12,
