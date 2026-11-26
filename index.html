@@ -171,7 +171,6 @@
 </div>
 
 <script>
-    // Базовый URL для raw-файлов GitHub
     const AUDIO_BASE_URL = "https://raw.githubusercontent.com/s-smk17/project-343/main/fedor_andrey/";
 
     const POINTS = [
@@ -209,7 +208,7 @@
     const DEFAULT_LAT = 59.841925; 
     const DEFAULT_LNG = 30.251472;
     const CHECK_INTERVAL = 10000; 
-    const TRIGGER_RADIUS = 100; // Изменено на 100 метров
+    const TRIGGER_RADIUS = 100; // 100 метров
 
     let currentIndex = 0;
     let currentGpsLat = DEFAULT_LAT;
@@ -238,6 +237,18 @@
     function startApp() {
         document.getElementById('start-screen').style.display = 'none';
         document.getElementById('app-container').style.display = 'flex';
+
+        // ЧИСТАЯ РАЗБЛОКИРОВКА АУДИО
+        // Создаем AudioContext и возобновляем его по клику. Это разрешает браузеру играть звуки.
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) {
+                const ctx = new AudioContext();
+                if (ctx.state === 'suspended') ctx.resume();
+            }
+        } catch(e) {
+            console.log("Audio unlock skipped");
+        }
 
         ymaps.ready(() => {
             map = new ymaps.Map("map", {
@@ -361,14 +372,13 @@
         audioPlayer.pause();
         audioPlayer.currentTime = 0;
         
-        // Формируем полный URL с кодированием пробелов и спецсимволов
         const encodedFileName = encodeURIComponent(point.audioFile);
         const audioUrl = AUDIO_BASE_URL + encodedFileName;
 
         audioPlayer.src = audioUrl;
         audioPlayer.play().catch(e => {
             console.warn(`Не удалось воспроизвести аудио: ${audioUrl}`, e);
-            statusText.textContent = `Ошибка загрузки аудио для точки ${point.num}.`;
+            statusText.textContent = `Нажмите на карту, чтобы разрешить звук.`;
         });
     }
 
