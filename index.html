@@ -89,12 +89,11 @@
         #btn-locate:active { background: #e6f0ff; }
         #btn-locate svg { width: 26px; height: 26px; fill: #007bff; display: block; }
 
-        .info { text-align: center; font-size: 14px; color: #333; margin-bottom: 5px; }
+        .info { text-align: center; font-size: 14px; color: #333; margin-bottom: 5px; line-height: 1.4; }
         .poi-title { 
             font-weight: bold; color: #007bff; font-size: 16px; display: block; margin-top: 5px; line-height: 1.3;
         }
         .landmark-title { color: #e67e22 !important; }
-        .manual-mode-text { color: #666 !important; }
     </style>
 </head>
 <body>
@@ -178,11 +177,9 @@
     let currentGpsLat = DEFAULT_LAT;
     let currentGpsLng = DEFAULT_LNG;
     let gpsAvailable = false;
-    
-    // ГЛАВНЫЕ ФЛАГИ
-    let isAutoMode = true;     // true = едем по GPS, false = листаем руками
+    let isAutoMode = true;
     let firstGpsReceived = false;
-    let lastPlayedIndex = -1;  // Чтобы аудио не играло повторно
+    let lastPlayedIndex = -1; 
 
     let map;
     let routeMarkers = [];
@@ -243,19 +240,25 @@
         setInterval(checkLocationAndPlay, CHECK_INTERVAL);
     }
 
-    // КНОПКА "НАЙТИ МЕНЯ" - Мгновенно центрирует и включает авто-режим
+    // КНОПКА "НАЙТИ МЕНЯ" - Мгновенно центрирует и сбрасывает на ближайшую остановку
     btnLocate.addEventListener('click', () => {
         if (gpsAvailable && map) {
-            // Мгновенный перенос без "полета"
+            // 1. Включаем авто-режим (сбрасываем ручной просмотр)
+            isAutoMode = true;
+            
+            // 2. Принудительно ищем ближайшую остановку
+            currentIndex = findNearestPointIndex(currentGpsLat, currentGpsLng);
+            const point = POINTS[currentIndex];
+            const dist = Math.round(getDistance(currentGpsLat, currentGpsLng, point.lat, point.lng));
+            
+            // 3. Обновляем нижнюю панель (название остановки)
+            updateUI(false);
+            
+            // 4. Центрируем карту на пользователе (зум 17)
             map.setCenter([currentGpsLat, currentGpsLng], 17);
             
-            // Возвращаем авто-режим и находим ближайшую остановку
-            isAutoMode = true;
-            let nearestIdx = findNearestPointIndex(currentGpsLat, currentGpsLng);
-            currentIndex = nearestIdx;
-            
-            updateUI(false);
-            statusText.textContent = "Режим поездки активирован";
+            // 5. Выводим текст с остановкой и расстоянием в статус-бар
+            statusText.innerHTML = `Карта центрирована на вас.<br>Ближайшая остановка к вам: <b>${point.num}. ${point.name}</b> (${dist} м)`;
         } else {
             statusText.textContent = "Ожидание сигнала GPS...";
         }
@@ -277,9 +280,8 @@
                 preset: iconPreset
             });
 
-            // КЛИК ПО МАРКЕРУ (Ручной режим, без аудио)
             placemark.events.add('click', function () {
-                isAutoMode = false; // Отключаем GPS, чтобы он не сбил выбор
+                isAutoMode = false; 
                 currentIndex = idx;      
                 updateUI(true);          
                 statusText.textContent = "Режим просмотра";
@@ -325,7 +327,6 @@
             }
         }
         
-        // Обновляем текст с расстоянием
         if (isAutoMode) {
              updateUI(false);
         }
@@ -345,7 +346,6 @@
         }
     }
 
-    // Вспомогательная функция поиска индекса ближайшей точки
     function findNearestPointIndex(lat, lng) {
         let minDist = Infinity;
         let nearestIdx = 0;
@@ -361,7 +361,7 @@
         updateUI(false); 
         
         if (map) {
-            map.setCenter([lat, lng], 16); // Сразу нормальный зум
+            map.setCenter([lat, lng], 16);
         }
         statusText.textContent = "Маршрут синхронизирован";
     }
@@ -387,12 +387,11 @@
     }
 
     function checkLocationAndPlay() {
-        if (!gpsAvailable || !isAutoMode) return; // Если ручной режим - GPS игнорируем
+        if (!gpsAvailable || !isAutoMode) return; 
         
         let nearestIdx = findNearestPointIndex(currentGpsLat, currentGpsLng);
         let dist = getDistance(currentGpsLat, currentGpsLng, POINTS[nearestIdx].lat, POINTS[nearestIdx].lng);
         
-        // Если мы в радиусе 100 метров и это НОВАЯ точка
         if (dist <= TRIGGER_RADIUS && lastPlayedIndex !== nearestIdx) {
             currentIndex = nearestIdx;
             playAudio(currentIndex);
@@ -400,17 +399,15 @@
             updateUI(false);
             statusText.textContent = `Приближаемся: ${POINTS[currentIndex].name}`;
         } 
-        // Если мы просто едем, обновляем индекс на ближайший
         else if (nearestIdx !== currentIndex) {
             currentIndex = nearestIdx;
             updateUI(false);
         } 
         else {
-            updateUI(false); // Обновляем расстояние в тексте
+            updateUI(false);
         }
     }
 
-    // ОБНОВЛЕНИЕ ПАНЕЛИ
     function updateUI(centerMap = false) {
         if (POINTS.length === 0) return;
         
@@ -438,20 +435,18 @@
         }
     }
 
-    // КНОПКА "ВПЕРЕД" - Только переключение, БЕЗ звука
     btnNext.addEventListener('click', () => {
         if (currentIndex < POINTS.length - 1) { 
-            isAutoMode = false; // Отключаем авто-следование
+            isAutoMode = false; 
             currentIndex++; 
             updateUI(true); 
             statusText.textContent = "Режим просмотра";
         }
     });
 
-    // КНОПКА "НАЗАД" - Только переключение, БЕЗ звука
     btnPrev.addEventListener('click', () => {
         if (currentIndex > 0) { 
-            isAutoMode = false; // Отключаем авто-следование
+            isAutoMode = false; 
             currentIndex--; 
             updateUI(true); 
             statusText.textContent = "Режим просмотра";
