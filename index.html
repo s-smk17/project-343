@@ -153,13 +153,11 @@
     <div class="controls">
         <div class="btn-group">
             <button id="btn-prev" class="action-btn" disabled>◀ Назад</button>
-            
             <button id="btn-locate" class="action-btn" title="Найти меня">
                 <svg viewBox="0 0 24 24">
                     <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
                 </svg>
             </button>
-            
             <button id="btn-next" class="action-btn" disabled>Вперед ▶</button>
         </div>
         
@@ -215,6 +213,7 @@
     let currentGpsLng = DEFAULT_LNG;
     let gpsAvailable = false;
     let isAutoMode = true;
+    let firstGpsReceived = false; // Флаг первого получения GPS
 
     let map;
     let routeMarkers = [];
@@ -238,17 +237,14 @@
         document.getElementById('start-screen').style.display = 'none';
         document.getElementById('app-container').style.display = 'flex';
 
-        // ЧИСТАЯ РАЗБЛОКИРОВКА АУДИО
-        // Создаем AudioContext и возобновляем его по клику. Это разрешает браузеру играть звуки.
+        // Разблокировка аудио
         try {
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             if (AudioContext) {
                 const ctx = new AudioContext();
                 if (ctx.state === 'suspended') ctx.resume();
             }
-        } catch(e) {
-            console.log("Audio unlock skipped");
-        }
+        } catch(e) { console.log("Audio unlock skipped"); }
 
         ymaps.ready(() => {
             map = new ymaps.Map("map", {
@@ -259,6 +255,11 @@
 
             drawMapRoute();
             updateUI(false);
+            
+            // Если координаты уже получены, центрируем карту на пользователе
+            if (firstGpsReceived) {
+                map.setCenter([currentGpsLat, currentGpsLng], 15);
+            }
             
             setTimeout(() => {
                 if (map) map.container.fitToViewport();
@@ -273,6 +274,26 @@
         }
 
         setInterval(checkLocationAndPlay, CHECK_INTERVAL);
+    }
+
+    // Функция установки ближайшей точки при первом GPS
+    function setInitialLocation(lat, lng) {
+        let minDist = Infinity;
+        let nearestIdx = 0;
+        
+        POINTS.forEach((p, idx) => {
+            const d = getDistance(lat, lng, p.lat, p.lng);
+            if (d < minDist) { minDist = d; nearestIdx = idx; }
+        });
+        
+        currentIndex = nearestIdx;
+        updateUI(false); // Обновляем панель, но не центрируем на остановке
+        
+        if (map) {
+            map.setCenter([lat, lng], 15); // Центрируем карту на пользователе
+        }
+        
+        statusText.textContent = `Вы здесь. Ближайшая остановка: ${POINTS[currentIndex].name} (${Math.round(minDist)} м)`;
     }
 
     btnLocate.addEventListener('click', () => {
@@ -321,7 +342,10 @@
     }
 
     function onFirstGps(position) {
-        findNearestPoint(position.coords.latitude, position.coords.longitude);
+        if (!firstGpsReceived) {
+            firstGpsReceived = true;
+            setInitialLocation(position.coords.latitude, position.coords.longitude);
+        }
     }
 
     function onGpsUpdate(position) {
@@ -333,6 +357,12 @@
 
         currentGpsLat = position.coords.latitude; 
         currentGpsLng = position.coords.longitude;
+
+        // При первом обновлении также устанавливаем ближайшую точку
+        if (!firstGpsReceived) {
+            firstGpsReceived = true;
+            setInitialLocation(currentGpsLat, currentGpsLng);
+        }
 
         if (map) {
             if (userPlacemark) {
