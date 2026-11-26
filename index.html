@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Аудиогид 343Э</title>
     
-    <!-- Подключаем ТОЛЬКО Яндекс Карты -->
+    <!-- Подключаем ТОЛЬКО Яндекс Карты (ВСТАВЬТЕ СВОЙ КЛЮЧ) -->
     <script src="https://api-maps.yandex.ru/2.1/?apikey=ВАШ_API_КЛЮЧ&lang=ru_RU" type="text/javascript"></script>
 
     <style>
@@ -125,8 +125,18 @@
         }
 
         .info { text-align: center; font-size: 14px; color: #333; margin-bottom: 5px; }
-        .poi-title { font-weight: bold; color: #007bff; font-size: 17px; display: block; margin-top: 5px; }
+        
+        /* Объединенный стиль для названия остановки и расстояния */
+        .poi-title { 
+            font-weight: bold; 
+            color: #007bff; 
+            font-size: 17px; 
+            display: block; 
+            margin-top: 5px; 
+            line-height: 1.3;
+        }
         .landmark-title { color: #e67e22 !important; }
+        .distance-text { color: #666; font-size: 15px; font-weight: normal; }
     </style>
 </head>
 <body>
@@ -162,8 +172,8 @@
         </div>
         
         <div class="info" id="status-text">Ожидание GPS...</div>
-        <div class="info">
-            <span id="current-poi">Текущая: —</span>
+        <div class="info" id="current-poi-container">
+            <span id="current-poi" class="poi-title">Текущая: —</span>
         </div>
     </div>
 </div>
@@ -206,14 +216,14 @@
     const DEFAULT_LAT = 59.841925; 
     const DEFAULT_LNG = 30.251472;
     const CHECK_INTERVAL = 10000; 
-    const TRIGGER_RADIUS = 100; // 100 метров
+    const TRIGGER_RADIUS = 100; 
 
     let currentIndex = 0;
     let currentGpsLat = DEFAULT_LAT;
     let currentGpsLng = DEFAULT_LNG;
     let gpsAvailable = false;
     let isAutoMode = true;
-    let firstGpsReceived = false; // Флаг первого получения GPS
+    let firstGpsReceived = false;
 
     let map;
     let routeMarkers = [];
@@ -237,7 +247,6 @@
         document.getElementById('start-screen').style.display = 'none';
         document.getElementById('app-container').style.display = 'flex';
 
-        // Разблокировка аудио
         try {
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             if (AudioContext) {
@@ -256,7 +265,6 @@
             drawMapRoute();
             updateUI(false);
             
-            // Если координаты уже получены, центрируем карту на пользователе
             if (firstGpsReceived) {
                 map.setCenter([currentGpsLat, currentGpsLng], 15);
             }
@@ -274,26 +282,6 @@
         }
 
         setInterval(checkLocationAndPlay, CHECK_INTERVAL);
-    }
-
-    // Функция установки ближайшей точки при первом GPS
-    function setInitialLocation(lat, lng) {
-        let minDist = Infinity;
-        let nearestIdx = 0;
-        
-        POINTS.forEach((p, idx) => {
-            const d = getDistance(lat, lng, p.lat, p.lng);
-            if (d < minDist) { minDist = d; nearestIdx = idx; }
-        });
-        
-        currentIndex = nearestIdx;
-        updateUI(false); // Обновляем панель, но не центрируем на остановке
-        
-        if (map) {
-            map.setCenter([lat, lng], 15); // Центрируем карту на пользователе
-        }
-        
-        statusText.textContent = `Вы здесь. Ближайшая остановка: ${POINTS[currentIndex].name} (${Math.round(minDist)} м)`;
     }
 
     btnLocate.addEventListener('click', () => {
@@ -358,7 +346,6 @@
         currentGpsLat = position.coords.latitude; 
         currentGpsLng = position.coords.longitude;
 
-        // При первом обновлении также устанавливаем ближайшую точку
         if (!firstGpsReceived) {
             firstGpsReceived = true;
             setInitialLocation(currentGpsLat, currentGpsLng);
@@ -376,6 +363,11 @@
                 map.geoObjects.add(userPlacemark);
             }
         }
+        
+        // Обновляем расстояние на экране каждые 10 секунд
+        if(isAutoMode) {
+             updateUI(false);
+        }
     }
 
     function onGpsError(error) {
@@ -390,6 +382,26 @@
         } else if (error.code === 3) { 
             statusText.textContent = 'Поиск спутников GPS... Подождите.';
         }
+    }
+
+    // Устанавливает текущую точку на ту, которая ближе всего
+    function setInitialLocation(lat, lng) {
+        let minDist = Infinity;
+        let nearestIdx = 0;
+        
+        POINTS.forEach((p, idx) => {
+            const d = getDistance(lat, lng, p.lat, p.lng);
+            if (d < minDist) { minDist = d; nearestIdx = idx; }
+        });
+        
+        currentIndex = nearestIdx;
+        updateUI(false); 
+        
+        if (map) {
+            map.setCenter([lat, lng], 15);
+        }
+        
+        statusText.textContent = "Маршрут синхронизирован с вашим местоположением";
     }
 
     function playAudio(index) {
@@ -413,7 +425,7 @@
     }
 
     function findNearestPoint(lat = currentGpsLat, lng = currentGpsLng) {
-        if (POINTS.length === 0 || !isAutoMode) return; 
+        if (POINTS.length === 0) return; 
         
         let minDist = Infinity;
         let nearestIdx = currentIndex;
@@ -423,14 +435,20 @@
             if (d < minDist) { minDist = d; nearestIdx = idx; }
         });
         
-        if (nearestIdx !== currentIndex && minDist <= TRIGGER_RADIUS) {
-            currentIndex = nearestIdx; 
-            updateUI(false); 
-            playAudio(currentIndex);
-            statusText.textContent = `Приближаемся: ${POINTS[currentIndex].name}`;
-        } else {
-            statusText.textContent = `Ближайшая точка: ${POINTS[nearestIdx].name} (${Math.round(minDist)} м)`;
+        // Если мы едем в авто-режиме, и остановка сменилась
+        if (nearestIdx !== currentIndex) {
+            if (isAutoMode) {
+                currentIndex = nearestIdx;
+            }
+            
+            if (minDist <= TRIGGER_RADIUS) {
+                playAudio(currentIndex);
+                statusText.textContent = `Приближаемся: ${POINTS[currentIndex].name}`;
+            }
         }
+        
+        // Обновляем интерфейс (кнопки и расстояние)
+        updateUI(false);
     }
 
     function checkLocationAndPlay() {
@@ -438,17 +456,26 @@
         findNearestPoint();
     }
 
+    // Главная функция обновления интерфейса
     function updateUI(centerMap = false) {
         if (POINTS.length === 0) return;
         
         const point = POINTS[currentIndex];
+        
+        // Считаем расстояние, если GPS включен
+        let distText = "";
+        if (gpsAvailable) {
+            const dist = getDistance(currentGpsLat, currentGpsLng, point.lat, point.lng);
+            distText = ` <span class="distance-text">(${Math.round(dist)} м)</span>`;
+        }
 
         if (point.isLandmark) {
-            currentPoiText.innerHTML = `<span class="poi-title landmark-title">★ ${point.num} — ${point.name}</span>`;
+            currentPoiText.innerHTML = `<span class="poi-title landmark-title">★ ${point.num} — ${point.name}${distText}</span>`;
         } else {
-            currentPoiText.innerHTML = `<span class="poi-title">${point.num}. ${point.name}</span>`;
+            currentPoiText.innerHTML = `<span class="poi-title">${point.num}. ${point.name}${distText}</span>`;
         }
         
+        // Включаем/выключаем стрелки в зависимости от позиции
         btnPrev.disabled = (currentIndex === 0);
         btnNext.disabled = (currentIndex === POINTS.length - 1);
         
@@ -459,13 +486,19 @@
 
     btnNext.addEventListener('click', () => {
         if (currentIndex < POINTS.length - 1) { 
-            isAutoMode = false; currentIndex++; updateUI(true); playAudio(currentIndex);
+            isAutoMode = false; 
+            currentIndex++; 
+            updateUI(true); 
+            playAudio(currentIndex);
         }
     });
 
     btnPrev.addEventListener('click', () => {
         if (currentIndex > 0) { 
-            isAutoMode = false; currentIndex--; updateUI(true); playAudio(currentIndex);
+            isAutoMode = false; 
+            currentIndex--; 
+            updateUI(true); 
+            playAudio(currentIndex);
         }
     });
 
