@@ -1,10 +1,16 @@
 import asyncio
 import math
+import os
+from urllib.parse import quote
 
 import flet as ft
 import flet_audio as fta
 import flet_geolocator as ftg
 import flet_map as ftm
+
+# Для мобильной сборки ключ можно указать вторым аргументом getenv.
+YANDEX_TILES_API_KEY = os.getenv("YANDEX_TILES_API_KEY", "").strip()
+
 STOPS_343E = [
     {
         "name": "Разводная улица",
@@ -290,13 +296,19 @@ async def main(page: ft.Page):
         ),
         initial_center=ftm.MapLatitudeLongitude(latitude=59.908, longitude=29.778),
         initial_zoom=12,
+        max_zoom=20,
         layers=[
             ftm.TileLayer(
-                url_template="https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                url_template=(
+                    "https://tiles.api-maps.yandex.ru/v1/tiles/"
+                    "?x={x}&y={y}&z={z}&lang=ru_RU&l=map"
+                    "&projection=web_mercator"
+                    f"&apikey={quote(YANDEX_TILES_API_KEY, safe='')}"
+                ),
+                max_native_zoom=20,
                 user_agent_package_name="audio-guide-343e",
             ),
             ftm.MarkerLayer(markers=stop_markers + [current_marker]),
-            ftm.SimpleAttribution(text="© OpenStreetMap contributors"),
         ],
     )
    
@@ -659,12 +671,23 @@ async def main(page: ft.Page):
                         expand=True,
                         controls=[
                             map_control,
+                            ft.TextButton(
+                                content=ft.Image(src="yandex_logo.png", width=100),
+                                url="https://yandex.ru/maps/",
+                                tooltip="Открыть Яндекс Карты",
+                                style=ft.ButtonStyle(padding=0),
+                                left=0,
+                                bottom=0,
+                            ),
                             ft.Container(
                                 content=follow_button,
                                 right=12,
                                 bottom=12,
                             ),
                         ],
+                    ) if YANDEX_TILES_API_KEY else ft.Text(
+                        "Для загрузки Яндекс Карт укажите ключ Tiles API "
+                        "в YANDEX_TILES_API_KEY и перезапустите приложение."
                     ),
                     height=330,
                     border_radius=16,
@@ -981,3 +1004,6 @@ async def main(page: ft.Page):
 
 
 ft.run(main, assets_dir="assets")
+
+
+
