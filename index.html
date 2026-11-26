@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Аудиогид 343Э</title>
     
-    <!-- Подключаем ТОЛЬКО Яндекс Карты (ВСТАВЬТЕ СВОЙ КЛЮЧ) -->
+    <!-- ВСТАВЬТЕ СВОЙ API-КЛЮЧ ЯНДЕКСА -->
     <script src="https://api-maps.yandex.ru/2.1/?apikey=ВАШ_API_КЛЮЧ&lang=ru_RU" type="text/javascript"></script>
 
     <style>
@@ -44,21 +44,15 @@
         .gps-warning { 
             background: #ffcccc; color: #900; padding: 10px; font-size: 14px; 
             text-align: center; display: none; font-weight: bold; border-bottom: 2px solid #f00;
-            z-index: 2000; 
-            flex-shrink: 0; 
+            z-index: 2000; flex-shrink: 0; 
         }
 
         .map-wrapper { 
-            flex: 1; 
-            position: relative; 
-            width: 100%;
-            min-height: 0; 
+            flex: 1; position: relative; width: 100%; min-height: 0; 
         }
         
         #map { 
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%; 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
         }
 
         .gps-status {
@@ -71,84 +65,49 @@
         .gps-status.off { background: #dc3545; color: white; }
 
         .controls { 
-            flex-shrink: 0; 
-            background: #fff; 
-            width: 100%;
-            box-sizing: border-box; 
-            z-index: 5000; 
-            position: relative;
-            box-shadow: 0 -4px 15px rgba(0,0,0,0.15); 
-            padding: 15px; 
-            padding-bottom: calc(15px + env(safe-area-inset-bottom, 10px)); 
+            flex-shrink: 0; background: #fff; width: 100%; box-sizing: border-box; 
+            z-index: 5000; position: relative; box-shadow: 0 -4px 15px rgba(0,0,0,0.15); 
+            padding: 15px; padding-bottom: calc(15px + env(safe-area-inset-bottom, 10px)); 
         }
         
         .btn-group { 
-            display: flex; 
-            gap: 10px; 
-            margin-bottom: 12px; 
-            align-items: stretch; 
-            width: 100%;
-            box-sizing: border-box;
+            display: flex; gap: 10px; margin-bottom: 12px; align-items: stretch; 
+            width: 100%; box-sizing: border-box;
         }
         
         button.action-btn { 
-            flex: 1; 
-            padding: 14px 5px; 
-            font-size: 15px; 
-            border: none; 
-            border-radius: 8px; 
-            background: #007bff; 
-            color: white; 
-            font-weight: bold; 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-sizing: border-box;
+            flex: 1; padding: 14px 5px; font-size: 15px; border: none; border-radius: 8px; 
+            background: #007bff; color: white; font-weight: bold; 
+            display: flex; justify-content: center; align-items: center; box-sizing: border-box;
         }
         button.action-btn:active { background: #0056b3; }
         button.action-btn:disabled { background: #ccc; }
 
         #btn-locate { 
-            flex: 0 0 54px; 
-            min-width: 54px;
-            background: #fff; 
-            border: 2px solid #007bff;
-            padding: 0;
-            box-sizing: border-box;
+            flex: 0 0 54px; min-width: 54px; background: #fff; border: 2px solid #007bff; padding: 0; box-sizing: border-box;
         }
         #btn-locate:active { background: #e6f0ff; }
-        #btn-locate svg {
-            width: 26px;
-            height: 26px;
-            fill: #007bff;
-            display: block;
-        }
+        #btn-locate svg { width: 26px; height: 26px; fill: #007bff; display: block; }
 
         .info { text-align: center; font-size: 14px; color: #333; margin-bottom: 5px; }
-        
-        /* Объединенный стиль для названия остановки и расстояния */
         .poi-title { 
-            font-weight: bold; 
-            color: #007bff; 
-            font-size: 16px; 
-            display: block; 
-            margin-top: 5px; 
-            line-height: 1.3;
+            font-weight: bold; color: #007bff; font-size: 16px; display: block; margin-top: 5px; line-height: 1.3;
         }
         .landmark-title { color: #e67e22 !important; }
+        .manual-mode-text { color: #666 !important; }
     </style>
 </head>
 <body>
 
 <div id="start-screen">
     <h1>Аудиогид 343Э</h1>
-    <p>Для работы приложения и воспроизведения аудио по GPS необходим доступ к вашему местоположению. Пожалуйста, разрешите доступ.</p>
+    <p>Для работы приложения и воспроизведения аудио по GPS необходим доступ к вашему местоположению.</p>
     <button class="start-btn" onclick="startApp()">▶ Разрешить GPS и начать</button>
 </div>
 
 <div id="app-container">
     <div id="gps-warning" class="gps-warning">
-        Местоположение выключено. Для дальнейшего использования необходимо включить GPS, иначе приложение не будет показывать ваше местоположение.
+        Местоположение выключено. Для дальнейшего использования необходимо включить GPS.
     </div>
 
     <div class="map-wrapper">
@@ -162,10 +121,8 @@
     <div class="controls">
         <div class="btn-group">
             <button id="btn-prev" class="action-btn" disabled>◀ Назад</button>
-            <button id="btn-locate" class="action-btn" title="Найти меня">
-                <svg viewBox="0 0 24 24">
-                    <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
-                </svg>
+            <button id="btn-locate" class="action-btn" title="Вернуться на мое место">
+                <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
             </button>
             <button id="btn-next" class="action-btn" disabled>Вперед ▶</button>
         </div>
@@ -221,9 +178,11 @@
     let currentGpsLat = DEFAULT_LAT;
     let currentGpsLng = DEFAULT_LNG;
     let gpsAvailable = false;
-    let isAutoMode = true;
+    
+    // ГЛАВНЫЕ ФЛАГИ
+    let isAutoMode = true;     // true = едем по GPS, false = листаем руками
     let firstGpsReceived = false;
-    let lastPlayedIndex = -1; // Защита от повторного включения того же аудио
+    let lastPlayedIndex = -1;  // Чтобы аудио не играло повторно
 
     let map;
     let routeMarkers = [];
@@ -266,7 +225,7 @@
             updateUI(false);
             
             if (firstGpsReceived) {
-                map.setCenter([currentGpsLat, currentGpsLng], 15);
+                map.setCenter([currentGpsLat, currentGpsLng], 16);
             }
             
             setTimeout(() => {
@@ -284,11 +243,19 @@
         setInterval(checkLocationAndPlay, CHECK_INTERVAL);
     }
 
-    // Кнопка "Найти меня" - мгновенно приближает карту
+    // КНОПКА "НАЙТИ МЕНЯ" - Мгновенно центрирует и включает авто-режим
     btnLocate.addEventListener('click', () => {
         if (gpsAvailable && map) {
-            map.setCenter([currentGpsLat, currentGpsLng], 17, { duration: 300 });
-            statusText.textContent = "Карта центрирована на вас";
+            // Мгновенный перенос без "полета"
+            map.setCenter([currentGpsLat, currentGpsLng], 17);
+            
+            // Возвращаем авто-режим и находим ближайшую остановку
+            isAutoMode = true;
+            let nearestIdx = findNearestPointIndex(currentGpsLat, currentGpsLng);
+            currentIndex = nearestIdx;
+            
+            updateUI(false);
+            statusText.textContent = "Режим поездки активирован";
         } else {
             statusText.textContent = "Ожидание сигнала GPS...";
         }
@@ -310,20 +277,17 @@
                 preset: iconPreset
             });
 
-            // При клике на маркер просто переключаем интерфейс, БЕЗ включения аудио
+            // КЛИК ПО МАРКЕРУ (Ручной режим, без аудио)
             placemark.events.add('click', function () {
+                isAutoMode = false; // Отключаем GPS, чтобы он не сбил выбор
                 currentIndex = idx;      
                 updateUI(true);          
+                statusText.textContent = "Режим просмотра";
             });
 
             map.geoObjects.add(placemark);
             routeMarkers.push(placemark);
         });
-        
-        const bounds = map.geoObjects.getBounds();
-        if (bounds) {
-            map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 20 });
-        }
     }
 
     function onFirstGps(position) {
@@ -361,7 +325,7 @@
             }
         }
         
-        // Обновляем расстояние каждые 10 секунд, даже если стоим на месте
+        // Обновляем текст с расстоянием
         if (isAutoMode) {
              updateUI(false);
         }
@@ -381,22 +345,25 @@
         }
     }
 
-    function setInitialLocation(lat, lng) {
+    // Вспомогательная функция поиска индекса ближайшей точки
+    function findNearestPointIndex(lat, lng) {
         let minDist = Infinity;
         let nearestIdx = 0;
-        
         POINTS.forEach((p, idx) => {
             const d = getDistance(lat, lng, p.lat, p.lng);
             if (d < minDist) { minDist = d; nearestIdx = idx; }
         });
-        
-        currentIndex = nearestIdx;
+        return nearestIdx;
+    }
+
+    function setInitialLocation(lat, lng) {
+        currentIndex = findNearestPointIndex(lat, lng);
         updateUI(false); 
         
         if (map) {
-            map.setCenter([lat, lng], 15);
+            map.setCenter([lat, lng], 16); // Сразу нормальный зум
         }
-        statusText.textContent = "Маршрут синхронизирован с вашим местоположением";
+        statusText.textContent = "Маршрут синхронизирован";
     }
 
     function playAudio(index) {
@@ -414,56 +381,47 @@
 
         audioPlayer.src = audioUrl;
         audioPlayer.play().catch(e => {
-            console.warn(`Не удалось воспроизвести аудио: ${audioUrl}`, e);
+            console.warn(`Ошибка аудио: ${audioUrl}`, e);
             statusText.textContent = `Нажмите на карту, чтобы разрешить звук.`;
         });
     }
 
-    function findNearestPoint(lat = currentGpsLat, lng = currentGpsLng) {
-        if (POINTS.length === 0) return; 
+    function checkLocationAndPlay() {
+        if (!gpsAvailable || !isAutoMode) return; // Если ручной режим - GPS игнорируем
         
-        let minDist = Infinity;
-        let nearestIdx = currentIndex;
+        let nearestIdx = findNearestPointIndex(currentGpsLat, currentGpsLng);
+        let dist = getDistance(currentGpsLat, currentGpsLng, POINTS[nearestIdx].lat, POINTS[nearestIdx].lng);
         
-        POINTS.forEach((p, idx) => {
-            const d = getDistance(lat, lng, p.lat, p.lng);
-            if (d < minDist) { minDist = d; nearestIdx = idx; }
-        });
-        
-        // Если мы приблизились к новой остановке (в пределах 100 м)
-        if (nearestIdx !== currentIndex && minDist <= TRIGGER_RADIUS) {
-            currentIndex = nearestIdx; 
-            updateUI(false); 
-            
-            // Включаем аудио только если для этой точки оно еще не играло
-            if (lastPlayedIndex !== currentIndex) {
-                playAudio(currentIndex);
-                lastPlayedIndex = currentIndex;
-                statusText.textContent = `Приближаемся: ${POINTS[currentIndex].name}`;
-            }
-        } else if (nearestIdx === currentIndex) {
-            // Если стоим на месте, просто обновляем цифры расстояния
+        // Если мы в радиусе 100 метров и это НОВАЯ точка
+        if (dist <= TRIGGER_RADIUS && lastPlayedIndex !== nearestIdx) {
+            currentIndex = nearestIdx;
+            playAudio(currentIndex);
+            lastPlayedIndex = currentIndex;
             updateUI(false);
+            statusText.textContent = `Приближаемся: ${POINTS[currentIndex].name}`;
+        } 
+        // Если мы просто едем, обновляем индекс на ближайший
+        else if (nearestIdx !== currentIndex) {
+            currentIndex = nearestIdx;
+            updateUI(false);
+        } 
+        else {
+            updateUI(false); // Обновляем расстояние в тексте
         }
     }
 
-    function checkLocationAndPlay() {
-        if (!gpsAvailable || !isAutoMode) return;
-        findNearestPoint();
-    }
-
-    // Обновление нижней панели с учетом новых требований
+    // ОБНОВЛЕНИЕ ПАНЕЛИ
     function updateUI(centerMap = false) {
         if (POINTS.length === 0) return;
         
         const point = POINTS[currentIndex];
         
+        let prefix = isAutoMode ? "Ближайшая остановка к вам: " : "Выбрана остановка: ";
         let distText = "";
-        let prefix = "";
+        
         if (gpsAvailable) {
             const dist = getDistance(currentGpsLat, currentGpsLng, point.lat, point.lng);
             distText = ` (${Math.round(dist)} м)`;
-            prefix = "Ближайшая остановка к вам: ";
         }
 
         if (point.isLandmark) {
@@ -480,19 +438,23 @@
         }
     }
 
-    // Кнопка "Вперед" - БЕЗ включения аудио
+    // КНОПКА "ВПЕРЕД" - Только переключение, БЕЗ звука
     btnNext.addEventListener('click', () => {
         if (currentIndex < POINTS.length - 1) { 
+            isAutoMode = false; // Отключаем авто-следование
             currentIndex++; 
             updateUI(true); 
+            statusText.textContent = "Режим просмотра";
         }
     });
 
-    // Кнопка "Назад" - БЕЗ включения аудио
+    // КНОПКА "НАЗАД" - Только переключение, БЕЗ звука
     btnPrev.addEventListener('click', () => {
         if (currentIndex > 0) { 
+            isAutoMode = false; // Отключаем авто-следование
             currentIndex--; 
             updateUI(true); 
+            statusText.textContent = "Режим просмотра";
         }
     });
 
