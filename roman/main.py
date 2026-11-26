@@ -1,38 +1,31 @@
 import asyncio
 import math
-import time
 
 import flet as ft
 import flet_audio as fta
 import flet_geolocator as ftg
 import flet_map as ftm
-
-# --- Точки маршрута ---
-# Каждая точка — это "линия старта" аудио.
-# Аудио запускается, когда автобус ПРОХОДИТ точку в заданном направлении.
 STOPS_343E = [
     {
-        "name": "Ломоносов, Вокзал",
-        "lat": 59.875730, "lon": 29.921022,
-        "audio": "lomonosov.wav",
-        # Направление движения в градусах (азимут).
-        # 0 = север, 90 = восток, 180 = юг, 270 = запад.
-        # Если None — направление не проверяется.
+        "name": "Разводная улица",
+        "lat": 59.880860, "lon": 29.903453,
+        "audio": "razvodnaya.mp3",
     },
     {
-        "name": "Федюнинская улица",
-        "lat": 59.902710, "lon": 29.770293,
-        "audio": "faduninskaya.wav",
+        "name": "Фабричная улица",
+        "lat": 59.882902, "lon": 29.889711,
+        "audio": "fabrichnaya.mp3",
     },
-    # ... остальные
+    {
+        "name": "Николаевская Больница",
+        "lat" :59.878549, "lon": 29.919390,
+        "audio": "nikolaevskaya_bolnitsa.mp3",
+    }
 ]
 
-# Радиус срабатывания. НЕ МЕНЬШЕ 15 метров — иначе GPS проскочит.
 TRIGGER_RADIUS_M = 20
-
-# Минимальная скорость, чтобы считать, что мы реально едем, а не стоим.
-MIN_SPEED_MPS = 0.0
-
+DEFAULT_AUDIO_VOLUME = 1.0
+APP_VERSION = "1.1.0"
 
 def haversine(lat1, lon1, lat2, lon2):
     """Расстояние в метрах между двумя точками."""
@@ -43,28 +36,13 @@ def haversine(lat1, lon1, lat2, lon2):
     a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
-
-def bearing(lat1, lon1, lat2, lon2):
-    """Азимут из точки 1 в точку 2 (0–360°)."""
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dlambda = math.radians(lon2 - lon1)
-    x = math.sin(dlambda) * math.cos(phi2)
-    y = math.cos(phi1)*math.sin(phi2) - math.sin(phi1)*math.cos(phi2)*math.cos(dlambda)
-    return (math.degrees(math.atan2(x, y)) + 360) % 360
-
-
-def angle_diff(a, b):
-    """Минимальная разница между двумя углами (0–180°)."""
-    d = abs(a - b) % 360
-    return min(d, 360 - d)
-
-
-def main(page: ft.Page):
+async def main(page: ft.Page):
     page.title = "343Э — Аудиогид"
     page.padding = 0
     page.theme_mode = ft.ThemeMode.LIGHT
     page.theme = ft.Theme(color_scheme_seed=ft.Colors.BLUE)
     page.dark_theme = ft.Theme(color_scheme_seed=ft.Colors.BLUE)
+    prefs = ft.SharedPreferences()
 
     geo = ftg.Geolocator()
     page.services.append(geo)
@@ -76,16 +54,48 @@ def main(page: ft.Page):
     audio_buttons = {}
     audio_progress_bars = {}
     audio_time_labels = {}
-    audio_is_seeking = {
-    stop["name"]: False for stop in STOPS_343E
-    }
 
+    trigger_radius_m = TRIGGER_RADIUS_M
+    audio_volume = DEFAULT_AUDIO_VOLUME
+    settings_controls = {}
+
+    # Сначала создаём словари
     audio_positions_ms = {
         stop["name"]: 0 for stop in STOPS_343E
     }
+
     audio_durations_ms = {
         stop["name"]: 0 for stop in STOPS_343E
     }
+
+    audio_is_seeking = {
+        stop["name"]: False for stop in STOPS_343E
+    }
+
+    # Теперь загружаем сохранённые позиции
+    for stop in STOPS_343E:
+        key = f"audio_guide_343e.position.{stop['name']}"
+
+        saved_position = await prefs.get(key)
+
+        if saved_position is not None:
+            try:
+                audio_positions_ms[stop["name"]] = max(
+                    0, int(saved_position)
+                )
+            except (TypeError, ValueError):
+                audio_positions_ms[stop["name"]] = 0
+
+    async def save_audio_progress(name, position_ms):
+        key = f"audio_guide_343e.position.{name}"
+
+        try:
+            await prefs.set(
+                key,
+                max(0, int(position_ms))
+            )
+        except Exception as exc:
+            print("ОШИБКА СОХРАНЕНИЯ ПРОГРЕССА:", repr(exc))
 
     def format_audio_time(milliseconds):
         seconds = max(0, int(milliseconds / 1000))
@@ -120,23 +130,6 @@ def main(page: ft.Page):
 
         page.update()
 
-    def handle_audio_position(name, e):
-        audio_positions_ms[name] = int(e.position)
-        refresh_audio_progress(name)
-
-    def handle_audio_duration(name, e):
-            audio_durations_ms[name] = int(
-                e.duration.in_milliseconds
-            )
-
-            refresh_audio_progress(name)
-
-            if name in audio_progress_bars:
-                audio_progress_bars[name].disabled = (
-                    name != current_stop_name
-                    or audio_durations_ms[name] <= 0
-                )
-
     def start_audio_seek(name, e):
         audio_is_seeking[name] = True
 
@@ -167,6 +160,7 @@ def main(page: ft.Page):
             )
 
             audio_positions_ms[name] = target_ms
+            await save_audio_progress(name, target_ms)
 
         except Exception as exc:
             print("ОШИБКА ПЕРЕМОТКИ:", repr(exc))
@@ -176,11 +170,39 @@ def main(page: ft.Page):
             audio_is_seeking[name] = False
             refresh_audio_progress(name)
 
+    def handle_audio_position(name, e):
+        if current_stop_name != name:
+            return
+
+        position = int(e.position)
+
+        if (
+            not audio_is_seeking[name]
+            and position < audio_positions_ms[name]
+        ):
+            return
+
+        audio_positions_ms[name] = position
+
+        if not audio_is_seeking[name]:
+            refresh_audio_progress(name)
+
+            page.run_task(
+                save_audio_progress,
+                name,
+                position,
+            )
+
+        if name in audio_progress_bars:
+            audio_progress_bars[name].disabled = (
+                name != current_stop_name
+                or audio_durations_ms[name] <= 0
+            )
     def handle_audio_duration(name, e):
         audio_durations_ms[name] = int(
             e.duration.in_milliseconds
         )
-        
+
         refresh_audio_progress(name)
 
         if name in audio_progress_bars:
@@ -193,6 +215,7 @@ def main(page: ft.Page):
         audio = fta.Audio(
             src=stop["audio"],
             autoplay=False,
+            volume=audio_volume,
             release_mode=fta.ReleaseMode.STOP,
             on_position_change=lambda e, name=stop["name"]: handle_audio_position(name, e),
             on_duration_change=lambda e, name=stop["name"]: handle_audio_duration(name, e),
@@ -202,7 +225,6 @@ def main(page: ft.Page):
     audio_paused = False
     audio_lock = asyncio.Lock()
     triggered = {stop["name"]: False for stop in STOPS_343E}
-    prev_pos = None
     smooth_lat = None
     smooth_lon = None
     tracking_task = None
@@ -313,6 +335,13 @@ def main(page: ft.Page):
             else:
                 button.icon = ft.Icons.PLAY_CIRCLE_FILL
                 button.tooltip = "Воспроизвести"
+
+        for name, slider in audio_progress_bars.items():
+            slider.disabled = (
+                name != current_stop_name
+                or audio_durations_ms[name] <= 0
+            )
+
         page.update()
 
     def stop_card(stop):
@@ -431,6 +460,10 @@ def main(page: ft.Page):
 
         try:
             await audio_to_stop.pause()
+            await save_audio_progress(
+                stopped_name,
+                audio_positions_ms[stopped_name],
+            )
         except Exception as exc:
             print(f"Не удалось остановить аудио: {exc}")
         finally:
@@ -439,6 +472,17 @@ def main(page: ft.Page):
             audio_paused = False
             update_audio_buttons()
             log_info(f"Остановлено: {stopped_name}")
+
+    async def reset_excursion():
+        """Останавливает текущий рассказ и повторно разрешает GPS-срабатывания."""
+        await stop_all_audio()
+
+        for stop_name in triggered:
+            triggered[stop_name] = False
+
+        last_stop_text.value = "Последняя остановка: —"
+        status_text.value = "Экскурсия сброшена. Остановки готовы к повторному запуску."
+        page.update()
 
     async def play_audio(stop):
         nonlocal current_audio, current_stop_name, audio_paused
@@ -457,6 +501,12 @@ def main(page: ft.Page):
                         log_info(f"Сейчас играет: {stop['name']}")
                     else:
                         await current_audio.pause()
+
+                        await save_audio_progress(
+                            stop["name"],
+                            audio_positions_ms[stop["name"]],
+                        )
+
                         audio_paused = True
                         log_info(f"Пауза: {stop['name']}")
 
@@ -470,6 +520,12 @@ def main(page: ft.Page):
 
                     print("ОСТАНАВЛИВАЕМ:", old_name)
                     await old_audio.pause()
+
+                    await save_audio_progress(
+                        old_name,
+                        audio_positions_ms[old_name],
+                    )
+
                     await asyncio.sleep(0.2)
 
                     current_audio = None
@@ -486,11 +542,17 @@ def main(page: ft.Page):
 
                 update_audio_buttons()
 
-                audio_positions_ms[stop["name"]] = 0
+                start_position = audio_positions_ms[stop["name"]]
+
                 refresh_audio_progress(stop["name"])
 
                 print("ЗАПУСКАЕМ:", stop["name"])
-                await audio.play()
+                print("ВОЗОБНОВЛЯЕМ С ПОЗИЦИИ:", start_position)
+
+                await audio.play(
+                    ft.Duration(milliseconds=start_position)
+                
+                )
 
                 print("ВОСПРОИЗВЕДЕНИЕ ЗАПУЩЕНО:", stop["name"])
 
@@ -512,7 +574,8 @@ def main(page: ft.Page):
                 )
 
     async def check_location(lat, lon, speed):
-        nonlocal prev_pos, smooth_lat, smooth_lon
+        nonlocal smooth_lat, smooth_lon
+        
         speed_text = "—" if speed is None else f"{speed * 3.6:.1f} км/ч"
         if smooth_lat is None:
             smooth_lat = lat
@@ -537,7 +600,7 @@ def main(page: ft.Page):
 
         for stop in STOPS_343E:
             distance = haversine(lat, lon, stop["lat"], stop["lon"])
-            if distance > TRIGGER_RADIUS_M:
+            if distance > trigger_radius_m:
                 triggered[stop["name"]] = False
                 continue
             if triggered[stop["name"]]:
@@ -547,9 +610,6 @@ def main(page: ft.Page):
             page.run_task(play_audio, stop)
             last_stop_text.value = f"Последняя остановка: {stop['name']}"
             page.update()
-
-        if prev_pos is None or haversine(prev_pos[0], prev_pos[1], lat, lon) > 2:
-            prev_pos = (lat, lon, time.monotonic())
 
     async def start_tracking():
         try:
@@ -595,21 +655,20 @@ def main(page: ft.Page):
                 ft.Text("Маршрут 343Э", size=24, weight=ft.FontWeight.BOLD),
                 ft.Text("Остановки и текущее местоположение", size=13, color=ft.Colors.GREY),
                 ft.Container(
-                content=ft.Stack(
-                    expand=True,
-                    controls=[
-                        map_control,
-                        ft.Container(
-                            expand=True,
-                            alignment=ft.Alignment.BOTTOM_RIGHT,
-                            padding=12,
-                            content=follow_button,
-                        ),
-                    ],
-                ),
-                height=330,
-                border_radius=16,
-                clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                    content=ft.Stack(
+                        expand=True,
+                        controls=[
+                            map_control,
+                            ft.Container(
+                                content=follow_button,
+                                right=12,
+                                bottom=12,
+                            ),
+                        ],
+                    ),
+                    height=330,
+                    border_radius=16,
+                    clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                 ),
                 ft.Container(
                     padding=12,
@@ -645,13 +704,213 @@ def main(page: ft.Page):
             ],
         )
 
+    def on_radius_change(e):
+        nonlocal trigger_radius_m
+        trigger_radius_m = int(round(e.control.value))
+        label = settings_controls.get("radius_label")
+        if label is not None:
+            label.value = f"{trigger_radius_m} м"
+        page.update()
+
+    async def save_radius_setting(e):
+        try:
+            await prefs.set("audio_guide_343e.trigger_radius_m", trigger_radius_m)
+        except Exception as exc:
+            print("Не удалось сохранить радиус GPS:", repr(exc))
+
+    def on_volume_change(e):
+        nonlocal audio_volume
+        volume_percent = int(round(e.control.value))
+        audio_volume = volume_percent / 100.0
+
+        # Применяем громкость сразу ко всем заранее созданным плеерам.
+        for audio in audio_players.values():
+            audio.volume = audio_volume
+            audio.update()
+
+        label = settings_controls.get("volume_label")
+        if label is not None:
+            label.value = f"{volume_percent}%"
+        page.update()
+
+    async def save_volume_setting(e):
+        try:
+            await prefs.set("audio_guide_343e.audio_volume", audio_volume)
+        except Exception as exc:
+            print("Не удалось сохранить громкость:", repr(exc))
+
+    async def change_theme(value):
+        page.theme_mode = {
+            "light": ft.ThemeMode.LIGHT,
+            "dark": ft.ThemeMode.DARK,
+            "system": ft.ThemeMode.SYSTEM,
+        }[value]
+        try:
+            await prefs.set("audio_guide_343e.theme", value)
+        except Exception as exc:
+            print("Не удалось сохранить тему:", repr(exc))
+        page.update()
+
+    async def load_saved_settings():
+        nonlocal trigger_radius_m, audio_volume
+        try:
+            saved_radius = await prefs.get("audio_guide_343e.trigger_radius_m")
+            if saved_radius is not None:
+                trigger_radius_m = max(15, min(50, int(saved_radius)))
+
+            saved_volume = await prefs.get("audio_guide_343e.audio_volume")
+            if saved_volume is not None:
+                audio_volume = max(0.0, min(1.0, float(saved_volume)))
+
+            saved_theme = await prefs.get("audio_guide_343e.theme")
+            theme_modes = {
+                "light": ft.ThemeMode.LIGHT,
+                "dark": ft.ThemeMode.DARK,
+                "system": ft.ThemeMode.SYSTEM,
+            }
+            if saved_theme in theme_modes:
+                page.theme_mode = theme_modes[saved_theme]
+
+            for audio in audio_players.values():
+                audio.volume = audio_volume
+                audio.update()
+
+            radius_slider = settings_controls.get("radius_slider")
+            radius_label = settings_controls.get("radius_label")
+            if radius_slider is not None:
+                radius_slider.value = trigger_radius_m
+            if radius_label is not None:
+                radius_label.value = f"{trigger_radius_m} м"
+
+            volume_slider = settings_controls.get("volume_slider")
+            volume_label = settings_controls.get("volume_label")
+            if volume_slider is not None:
+                volume_slider.value = int(round(audio_volume * 100))
+            if volume_label is not None:
+                volume_label.value = f"{int(round(audio_volume * 100))}%"
+
+            page.update()
+        except Exception as exc:
+            print("Не удалось загрузить настройки:", repr(exc))
+
     def build_settings_screen():
+        radius_label = ft.Text(f"{trigger_radius_m} м", weight=ft.FontWeight.BOLD)
+        volume_label = ft.Text(
+            f"{int(round(audio_volume * 100))}%",
+            weight=ft.FontWeight.BOLD,
+        )
+
+        radius_slider = ft.Slider(
+            min=15,
+            max=50,
+            divisions=7,
+            value=trigger_radius_m,
+            on_change=on_radius_change,
+            on_change_end=save_radius_setting,
+        )
+        volume_slider = ft.Slider(
+            min=0,
+            max=100,
+            divisions=20,
+            value=int(round(audio_volume * 100)),
+            on_change=on_volume_change,
+            on_change_end=save_volume_setting,
+        )
+
+        settings_controls["radius_slider"] = radius_slider
+        settings_controls["radius_label"] = radius_label
+        settings_controls["volume_slider"] = volume_slider
+        settings_controls["volume_label"] = volume_label
+
         return ft.Column(
             expand=True,
             scroll=ft.ScrollMode.AUTO,
             spacing=16,
             controls=[
                 ft.Text("Настройки", size=24, weight=ft.FontWeight.BOLD),
+
+                ft.Card(
+                    content=ft.Container(
+                        padding=16,
+                        content=ft.Column(
+                            spacing=8,
+                            controls=[
+                                ft.Row(
+                                    controls=[
+                                        ft.Icon(ft.Icons.GPS_FIXED, color=ft.Colors.BLUE),
+                                        ft.Text("Радиус срабатывания GPS", size=17, weight=ft.FontWeight.BOLD),
+                                        ft.Container(expand=True),
+                                        radius_label,
+                                    ],
+                                ),
+                                ft.Text(
+                                    "Расстояние до остановки, при котором запускается рассказ.",
+                                    size=12,
+                                    color=ft.Colors.GREY,
+                                ),
+                                radius_slider,
+                                ft.Row(
+                                    controls=[
+                                        ft.Text("15 м", size=11, color=ft.Colors.GREY),
+                                        ft.Container(expand=True),
+                                        ft.Text("50 м", size=11, color=ft.Colors.GREY),
+                                    ],
+                                ),
+                            ],
+                        ),
+                    ),
+                ),
+
+                ft.Card(
+                    content=ft.Container(
+                        padding=16,
+                        content=ft.Column(
+                            spacing=8,
+                            controls=[
+                                ft.Row(
+                                    controls=[
+                                        ft.Icon(ft.Icons.VOLUME_UP, color=ft.Colors.BLUE),
+                                        ft.Text("Громкость аудио", size=17, weight=ft.FontWeight.BOLD),
+                                        ft.Container(expand=True),
+                                        volume_label,
+                                    ],
+                                ),
+                                ft.Row(
+                                    controls=[
+                                        ft.Icon(ft.Icons.VOLUME_OFF, color=ft.Colors.GREY),
+                                        volume_slider,
+                                        ft.Icon(ft.Icons.VOLUME_UP, color=ft.Colors.GREY),
+                                    ],
+                                    spacing=8,
+                                ),
+                            ],
+                        ),
+                    ),
+                ),
+
+                ft.Card(
+                    content=ft.Container(
+                        padding=16,
+                        content=ft.Column(
+                            spacing=8,
+                            controls=[
+                                ft.Text("Экскурсия", size=17, weight=ft.FontWeight.BOLD),
+                                ft.Text(
+                                    "Сбросить отметки остановок, чтобы пройти маршрут и прослушать рассказы заново.",
+                                    size=12,
+                                    color=ft.Colors.GREY,
+                                ),
+                                ft.OutlinedButton(
+                                    "Сбросить экскурсию",
+                                    icon=ft.Icons.REFRESH,
+                                    on_click=lambda e: page.run_task(reset_excursion),
+                                    width=float("inf"),
+                                ),
+                            ],
+                        ),
+                    ),
+                ),
+
                 ft.Card(
                     content=ft.Container(
                         padding=16,
@@ -664,15 +923,15 @@ def main(page: ft.Page):
                                     controls=[
                                         ft.OutlinedButton(
                                             "Светлая",
-                                            on_click=lambda e: change_theme("light"),
+                                            on_click=lambda e: page.run_task(change_theme, "light"),
                                         ),
                                         ft.OutlinedButton(
                                             "Тёмная",
-                                            on_click=lambda e: change_theme("dark"),
+                                            on_click=lambda e: page.run_task(change_theme, "dark"),
                                         ),
                                         ft.OutlinedButton(
                                             "Системная",
-                                        on_click=lambda e: change_theme("system"),
+                                            on_click=lambda e: page.run_task(change_theme, "system"),
                                         ),
                                     ],
                                     wrap=True,
@@ -681,17 +940,20 @@ def main(page: ft.Page):
                         ),
                     ),
                 ),
-                ft.Text("Аудиофайлы должны находиться в папке assets проекта.", size=13, color=ft.Colors.GREY),
+
+                ft.Text(
+                    "Аудиофайлы должны находиться в папке assets проекта.",
+                    size=13,
+                    color=ft.Colors.GREY,
+                ),
+                ft.Text(
+                    f"Аудиогид 343Э · Версия {APP_VERSION}",
+                    size=12,
+                    color=ft.Colors.GREY,
+                    text_align=ft.TextAlign.CENTER,
+                ),
             ],
         )
-
-    def change_theme(value):
-        page.theme_mode = {
-            "light": ft.ThemeMode.LIGHT,
-            "dark": ft.ThemeMode.DARK,
-            "system": ft.ThemeMode.SYSTEM,
-        }[value]
-        page.update()
 
     def render_screen(index):
         nonlocal selected_screen
@@ -715,6 +977,7 @@ def main(page: ft.Page):
     )
     page.add(content_host)
     render_screen(0)
+    page.run_task(load_saved_settings)
 
 
 ft.run(main, assets_dir="assets")
