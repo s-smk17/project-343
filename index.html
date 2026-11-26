@@ -130,13 +130,12 @@
         .poi-title { 
             font-weight: bold; 
             color: #007bff; 
-            font-size: 17px; 
+            font-size: 16px; 
             display: block; 
             margin-top: 5px; 
             line-height: 1.3;
         }
         .landmark-title { color: #e67e22 !important; }
-        .distance-text { color: #666; font-size: 15px; font-weight: normal; }
     </style>
 </head>
 <body>
@@ -172,7 +171,7 @@
         </div>
         
         <div class="info" id="status-text">Ожидание GPS...</div>
-        <div class="info" id="current-poi-container">
+        <div class="info">
             <span id="current-poi" class="poi-title">Текущая: —</span>
         </div>
     </div>
@@ -224,6 +223,7 @@
     let gpsAvailable = false;
     let isAutoMode = true;
     let firstGpsReceived = false;
+    let lastPlayedIndex = -1; // Защита от повторного включения того же аудио
 
     let map;
     let routeMarkers = [];
@@ -284,12 +284,10 @@
         setInterval(checkLocationAndPlay, CHECK_INTERVAL);
     }
 
+    // Кнопка "Найти меня" - мгновенно приближает карту
     btnLocate.addEventListener('click', () => {
         if (gpsAvailable && map) {
-            map.panTo([currentGpsLat, currentGpsLng], {
-                zoom: 16,
-                duration: 500
-            });
+            map.setCenter([currentGpsLat, currentGpsLng], 17, { duration: 300 });
             statusText.textContent = "Карта центрирована на вас";
         } else {
             statusText.textContent = "Ожидание сигнала GPS...";
@@ -312,11 +310,10 @@
                 preset: iconPreset
             });
 
+            // При клике на маркер просто переключаем интерфейс, БЕЗ включения аудио
             placemark.events.add('click', function () {
-                isAutoMode = false;      
                 currentIndex = idx;      
                 updateUI(true);          
-                playAudio(currentIndex); 
             });
 
             map.geoObjects.add(placemark);
@@ -364,8 +361,8 @@
             }
         }
         
-        // Обновляем расстояние на экране каждые 10 секунд
-        if(isAutoMode) {
+        // Обновляем расстояние каждые 10 секунд, даже если стоим на месте
+        if (isAutoMode) {
              updateUI(false);
         }
     }
@@ -384,7 +381,6 @@
         }
     }
 
-    // Устанавливает текущую точку на ту, которая ближе всего
     function setInitialLocation(lat, lng) {
         let minDist = Infinity;
         let nearestIdx = 0;
@@ -400,7 +396,6 @@
         if (map) {
             map.setCenter([lat, lng], 15);
         }
-        
         statusText.textContent = "Маршрут синхронизирован с вашим местоположением";
     }
 
@@ -435,20 +430,21 @@
             if (d < minDist) { minDist = d; nearestIdx = idx; }
         });
         
-        // Если мы едем в авто-режиме, и остановка сменилась
-        if (nearestIdx !== currentIndex) {
-            if (isAutoMode) {
-                currentIndex = nearestIdx;
-            }
+        // Если мы приблизились к новой остановке (в пределах 100 м)
+        if (nearestIdx !== currentIndex && minDist <= TRIGGER_RADIUS) {
+            currentIndex = nearestIdx; 
+            updateUI(false); 
             
-            if (minDist <= TRIGGER_RADIUS) {
+            // Включаем аудио только если для этой точки оно еще не играло
+            if (lastPlayedIndex !== currentIndex) {
                 playAudio(currentIndex);
+                lastPlayedIndex = currentIndex;
                 statusText.textContent = `Приближаемся: ${POINTS[currentIndex].name}`;
             }
+        } else if (nearestIdx === currentIndex) {
+            // Если стоим на месте, просто обновляем цифры расстояния
+            updateUI(false);
         }
-        
-        // Обновляем интерфейс (кнопки и расстояние)
-        updateUI(false);
     }
 
     function checkLocationAndPlay() {
@@ -456,26 +452,26 @@
         findNearestPoint();
     }
 
-    // Главная функция обновления интерфейса
+    // Обновление нижней панели с учетом новых требований
     function updateUI(centerMap = false) {
         if (POINTS.length === 0) return;
         
         const point = POINTS[currentIndex];
         
-        // Считаем расстояние, если GPS включен
         let distText = "";
+        let prefix = "";
         if (gpsAvailable) {
             const dist = getDistance(currentGpsLat, currentGpsLng, point.lat, point.lng);
-            distText = ` <span class="distance-text">(${Math.round(dist)} м)</span>`;
+            distText = ` (${Math.round(dist)} м)`;
+            prefix = "Ближайшая остановка к вам: ";
         }
 
         if (point.isLandmark) {
-            currentPoiText.innerHTML = `<span class="poi-title landmark-title">★ ${point.num} — ${point.name}${distText}</span>`;
+            currentPoiText.innerHTML = `<span class="poi-title landmark-title">${prefix}★ ${point.num} — ${point.name}${distText}</span>`;
         } else {
-            currentPoiText.innerHTML = `<span class="poi-title">${point.num}. ${point.name}${distText}</span>`;
+            currentPoiText.innerHTML = `<span class="poi-title">${prefix}${point.num}. ${point.name}${distText}</span>`;
         }
         
-        // Включаем/выключаем стрелки в зависимости от позиции
         btnPrev.disabled = (currentIndex === 0);
         btnNext.disabled = (currentIndex === POINTS.length - 1);
         
@@ -484,21 +480,19 @@
         }
     }
 
+    // Кнопка "Вперед" - БЕЗ включения аудио
     btnNext.addEventListener('click', () => {
         if (currentIndex < POINTS.length - 1) { 
-            isAutoMode = false; 
             currentIndex++; 
             updateUI(true); 
-            playAudio(currentIndex);
         }
     });
 
+    // Кнопка "Назад" - БЕЗ включения аудио
     btnPrev.addEventListener('click', () => {
         if (currentIndex > 0) { 
-            isAutoMode = false; 
             currentIndex--; 
             updateUI(true); 
-            playAudio(currentIndex);
         }
     });
 
