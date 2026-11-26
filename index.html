@@ -79,7 +79,7 @@
         <div class="info">
             <span id="current-poi" class="poi-title">Текущая: —</span>
         </div>
-        <div class="version-tag">Версия V5 (Дата обновления: 26.11.2026, 14:28)</div>
+        <div class="version-tag">Версия V8 (Дата обновления: 26.11.2026, 15:05)</div>
     </div>
 </div>
 
@@ -129,7 +129,8 @@
     let gpsAvailable = false;
     let isAutoMode = true;
     let firstGpsReceived = false;
-    let lastPlayedIndex = -1; 
+    let lastPlayedIndex = -1;
+    let gpsWatchStarted = false; 
 
     let map;
     let routeMarkers = [];
@@ -148,6 +149,38 @@
 
     const svgGpsOn = `<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
     const svgGpsOff = `<svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/><line x1="1" y1="1" x2="23" y2="23" stroke="white" stroke-width="3"/></svg>`;
+
+    // ================== GPS: сначала точный, затем по Wi-Fi и сети ==================
+    function startGps() {
+        if (!navigator.geolocation) {
+            statusText.textContent = 'Браузер не поддерживает геолокацию.';
+            return;
+        }
+        statusText.textContent = 'Поиск спутников GPS (до 20 сек)...';
+        navigator.geolocation.getCurrentPosition(onFirstGps, (err) => {
+            if (err.code === 3 || err.code === 2) {
+                statusText.textContent = 'Точный GPS недоступен, пробуем по Wi-Fi и сети...';
+                navigator.geolocation.getCurrentPosition(onFirstGps, (err2) => {
+                    onGpsError(err2);
+                    startWatchGps();
+                }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
+            } else {
+                onGpsError(err);
+                startWatchGps();
+            }
+        }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+    }
+
+    function startWatchGps() {
+        if (gpsWatchStarted) return;
+        gpsWatchStarted = true;
+        navigator.geolocation.watchPosition(onGpsUpdate, (err) => {
+            gpsAvailable = false;
+            gpsStatusBar.className = 'gps-status off';
+            gpsIcon.innerHTML = svgGpsOff;
+            gpsLabel.textContent = "GPS потерян";
+        }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+    }
 
     function startApp() {
         document.getElementById('start-screen').style.display = 'none';
@@ -180,13 +213,7 @@
             }, 300);
         });
 
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(onFirstGps, onGpsError, { enableHighAccuracy: true, timeout: 10000 });
-            navigator.geolocation.watchPosition(onGpsUpdate, onGpsError, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
-        } else { 
-            onGpsError({ code: 1 }); 
-        }
-
+        startGps();
         setInterval(checkLocationAndPlay, CHECK_INTERVAL);
     }
 
@@ -235,10 +262,21 @@
     }
 
     function onFirstGps(position) {
+        gpsAvailable = true;
+        gpsWarning.style.display = 'none';
+        gpsStatusBar.className = 'gps-status on';
+        gpsIcon.innerHTML = svgGpsOn;
+        gpsLabel.textContent = "GPS включен";
+
+        currentGpsLat = position.coords.latitude;
+        currentGpsLng = position.coords.longitude;
+
         if (!firstGpsReceived) {
             firstGpsReceived = true;
-            setInitialLocation(position.coords.latitude, position.coords.longitude);
+            setInitialLocation(currentGpsLat, currentGpsLng);
         }
+
+        startWatchGps();
     }
 
     function onGpsUpdate(position) {
@@ -280,12 +318,16 @@
         gpsIcon.innerHTML = svgGpsOff;
         gpsLabel.textContent = "GPS выключен";
 
-        if (error.code === 1) { 
+        let reason = 'Неизвестная ошибка GPS';
+        if (error.code === 1) {
+            reason = 'Доступ запрещён. Разрешите местоположение для сайта (значок замка в адресной строке) И включите геолокацию в шторке телефона.';
             gpsWarning.style.display = 'block';
-            statusText.textContent = 'Ожидание доступа к GPS...';
-        } else if (error.code === 3) { 
-            statusText.textContent = 'Поиск спутников GPS... Подождите.';
+        } else if (error.code === 2) {
+            reason = 'Местоположение недоступно: включите геолокацию в шторке и выйдите на открытое место.';
+        } else if (error.code === 3) {
+            reason = 'Долго нет сигнала. Подождите на улице или обновите страницу.';
         }
+        statusText.textContent = reason + ' (код ' + error.code + ')';
     }
 
     function findNearestPointIndex(lat, lng) {
