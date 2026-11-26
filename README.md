@@ -1,3 +1,5 @@
+https://aistudio.google.com/apps
+
 Ссылка на репозиторий с инструкциями:
 https://github.com/s-smk17/peterhof-audioguide
 
