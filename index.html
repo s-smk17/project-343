@@ -9,91 +9,40 @@
     <script src="https://api-maps.yandex.ru/2.1/?apikey=ВАШ_API_КЛЮЧ&lang=ru_RU" type="text/javascript"></script>
 
     <style>
-        html, body { 
-            height: 100%; 
-            margin: 0; 
-            padding: 0; 
-            font-family: sans-serif; 
-            overflow: hidden; 
-            background-color: #f4f4f4;
-        }
-        
-        #start-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #f4f4f4; z-index: 99999;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 20px; box-sizing: border-box; text-align: center;
-        }
+        html, body { height: 100%; margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; background-color: #f4f4f4; }
+        #start-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f4f4; z-index: 99999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; text-align: center; }
         #start-screen h1 { color: #007bff; margin-bottom: 10px; }
         #start-screen p { color: #555; margin-bottom: 30px; max-width: 300px; font-size: 15px; line-height: 1.4; }
-        .start-btn {
-            padding: 15px 30px; font-size: 18px; border: none; border-radius: 50px;
-            background: #28a745; color: white; font-weight: bold;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2); cursor: pointer;
-        }
+        .start-btn { padding: 15px 30px; font-size: 18px; border: none; border-radius: 50px; background: #28a745; color: white; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.2); cursor: pointer; }
         .start-btn:active { background: #218838; transform: scale(0.98); }
 
-        #app-container { 
-            display: none; 
-            position: fixed; 
-            top: 0; bottom: 0; left: 0; right: 0;
-            flex-direction: column; 
-            background: #fff;
-        }
-        
-        .gps-warning { 
-            background: #ffcccc; color: #900; padding: 10px; font-size: 14px; 
-            text-align: center; display: none; font-weight: bold; border-bottom: 2px solid #f00;
-            z-index: 2000; flex-shrink: 0; 
-        }
+        #app-container { display: none; position: fixed; top: 0; bottom: 0; left: 0; right: 0; flex-direction: column; background: #fff; }
+        .gps-warning { background: #ffcccc; color: #900; padding: 10px; font-size: 14px; text-align: center; display: none; font-weight: bold; border-bottom: 2px solid #f00; z-index: 2000; flex-shrink: 0; }
 
-        .map-wrapper { 
-            flex: 1; position: relative; width: 100%; min-height: 0; 
-        }
-        
-        #map { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-        }
+        .map-wrapper { flex: 1; position: relative; width: 100%; min-height: 0; }
+        #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
-        .gps-status {
-            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-            display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px;
-            font-weight: bold; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); z-index: 1500;
-            transition: all 0.3s ease;
-        }
+        .gps-status { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); z-index: 1500; transition: all 0.3s ease; }
         .gps-status.on { background: #28a745; color: white; }
         .gps-status.off { background: #dc3545; color: white; }
 
-        .controls { 
-            flex-shrink: 0; background: #fff; width: 100%; box-sizing: border-box; 
-            z-index: 5000; position: relative; box-shadow: 0 -4px 15px rgba(0,0,0,0.15); 
-            padding: 15px; padding-bottom: calc(15px + env(safe-area-inset-bottom, 10px)); 
-        }
+        .controls { flex-shrink: 0; background: #fff; width: 100%; box-sizing: border-box; z-index: 5000; position: relative; box-shadow: 0 -4px 15px rgba(0,0,0,0.15); padding: 15px; padding-bottom: calc(15px + env(safe-area-inset-bottom, 10px)); }
+        .btn-group { display: flex; gap: 10px; margin-bottom: 12px; align-items: stretch; width: 100%; box-sizing: border-box; }
         
-        .btn-group { 
-            display: flex; gap: 10px; margin-bottom: 12px; align-items: stretch; 
-            width: 100%; box-sizing: border-box;
-        }
-        
-        button.action-btn { 
-            flex: 1; padding: 14px 5px; font-size: 15px; border: none; border-radius: 8px; 
-            background: #007bff; color: white; font-weight: bold; 
-            display: flex; justify-content: center; align-items: center; box-sizing: border-box;
-        }
+        button.action-btn { flex: 1; padding: 14px 5px; font-size: 15px; border: none; border-radius: 8px; background: #007bff; color: white; font-weight: bold; display: flex; justify-content: center; align-items: center; box-sizing: border-box; }
         button.action-btn:active { background: #0056b3; }
         button.action-btn:disabled { background: #ccc; }
 
-        #btn-locate { 
-            flex: 0 0 54px; min-width: 54px; background: #fff; border: 2px solid #007bff; padding: 0; box-sizing: border-box;
-        }
+        #btn-locate { flex: 0 0 54px; min-width: 54px; background: #fff; border: 2px solid #007bff; padding: 0; box-sizing: border-box; }
         #btn-locate:active { background: #e6f0ff; }
         #btn-locate svg { width: 26px; height: 26px; fill: #007bff; display: block; }
 
         .info { text-align: center; font-size: 14px; color: #333; margin-bottom: 5px; line-height: 1.4; }
-        .poi-title { 
-            font-weight: bold; color: #007bff; font-size: 16px; display: block; margin-top: 5px; line-height: 1.3;
-        }
+        .poi-title { font-weight: bold; color: #007bff; font-size: 16px; display: block; margin-top: 5px; line-height: 1.3; }
         .landmark-title { color: #e67e22 !important; }
+        
+        /* Версия для проверки кэша */
+        .version-tag { text-align: center; font-size: 10px; color: #aaa; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -130,6 +79,7 @@
         <div class="info">
             <span id="current-poi" class="poi-title">Текущая: —</span>
         </div>
+        <div class="version-tag">Версия V4 (Убран дубль "Ближайшая остановка")</div>
     </div>
 </div>
 
@@ -243,22 +193,15 @@
     // КНОПКА "НАЙТИ МЕНЯ" - Мгновенно центрирует и сбрасывает на ближайшую остановку
     btnLocate.addEventListener('click', () => {
         if (gpsAvailable && map) {
-            // 1. Включаем авто-режим (сбрасываем ручной просмотр)
             isAutoMode = true;
-            
-            // 2. Принудительно ищем ближайшую остановку
             currentIndex = findNearestPointIndex(currentGpsLat, currentGpsLng);
             const point = POINTS[currentIndex];
             const dist = Math.round(getDistance(currentGpsLat, currentGpsLng, point.lat, point.lng));
             
-            // 3. Обновляем нижнюю панель (название остановки)
             updateUI(false);
-            
-            // 4. Центрируем карту на пользователе (зум 17)
             map.setCenter([currentGpsLat, currentGpsLng], 17);
             
-            // 5. Выводим текст с остановкой и расстоянием в статус-бар
-            statusText.innerHTML = `Карта центрирована на вас.<br>Ближайшая остановка к вам: <b>${point.num}. ${point.name}</b> (${dist} м)`;
+            statusText.innerHTML = `Карта центрирована на вас.`;
         } else {
             statusText.textContent = "Ожидание сигнала GPS...";
         }
@@ -271,7 +214,6 @@
 
         POINTS.forEach((p, idx) => {
             let iconPreset = p.isLandmark ? "islands#orangeIcon" : "islands#blueIcon";
-
             const placemark = new ymaps.Placemark([p.lat, p.lng], {
                 iconContent: p.num,
                 balloonContent: `<b>${p.num}. ${p.name}</b>`,
@@ -359,7 +301,6 @@
     function setInitialLocation(lat, lng) {
         currentIndex = findNearestPointIndex(lat, lng);
         updateUI(false); 
-        
         if (map) {
             map.setCenter([lat, lng], 16);
         }
@@ -372,13 +313,10 @@
             statusText.textContent = `Для точки ${point.num} аудио не найдено.`;
             return;
         }
-
         audioPlayer.pause();
         audioPlayer.currentTime = 0;
-        
         const encodedFileName = encodeURIComponent(point.audioFile);
         const audioUrl = AUDIO_BASE_URL + encodedFileName;
-
         audioPlayer.src = audioUrl;
         audioPlayer.play().catch(e => {
             console.warn(`Ошибка аудио: ${audioUrl}`, e);
