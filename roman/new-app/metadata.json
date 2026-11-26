@@ -1,6 +1,0 @@
-{
-  "name": "343Э — Аудиогид",
-  "description": "GPS-аудиогид по маршруту 343Э (Проспект Ветеранов — Стрельна — Петергоф — Ломоносов) с воспроизведением аудио из облака и поддержкой установки PWA на Android.",
-  "requestFramePermissions": ["geolocation"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
